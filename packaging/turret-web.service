@@ -1,0 +1,21 @@
+[Unit]
+Description=Local Robot Maintenance Web UI
+After=network.target
+
+[Service]
+Type=simple
+User=turret-web
+Group=turret-web
+Environment=TURRET_WEB_HOST=127.0.0.1
+Environment=TURRET_WEB_PORT=8080
+ExecStart=/usr/bin/python3 /opt/turret-web/server.py
+Restart=on-failure
+RestartSec=3
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+# sudo elevation for exactly the two commands listed in sudoers.d.
+# NoNewPrivileges=true would block this mechanism; do not enable it.
+
+[Install]
+WantedBy=multi-user.target
