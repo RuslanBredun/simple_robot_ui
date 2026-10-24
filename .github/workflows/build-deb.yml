@@ -1,0 +1,38 @@
+name: Build DEB
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Python tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Frontend install and build
+        run: |
+          cd frontend
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Package DEB
+        run: |
+          bash packaging/build-deb.sh
+          dpkg-deb --info dist/*.deb
+          dpkg-deb --contents dist/*.deb | grep -E 'server.py|index.html|turret-web.service'
+      - name: Upload offline DEB
+        uses: actions/upload-artifact@v4
+        with:
+          name: turret-web-deb
+          path: dist/*.deb
+          if-no-files-found: error
