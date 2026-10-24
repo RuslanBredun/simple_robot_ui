@@ -1,0 +1,2 @@
+# Only two service actions may be executed as root.
+turret-web ALL=(root) NOPASSWD: /usr/bin/systemctl stop turret.service, /usr/bin/systemctl restart turret.service
