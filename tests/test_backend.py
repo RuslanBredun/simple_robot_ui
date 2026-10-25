@@ -33,9 +33,48 @@ class QaCliTests(unittest.TestCase):
             result = QaCliAdapter().logs()
         self.assertEqual(result["text"], "recent log\n")
         self.assertEqual(run.call_args.args[0], [
-            "/usr/local/bin/turret-logs", "-n", "100", "--no-pager"
+            "/usr/local/bin/turret-logs", "--since", "1 hour ago",
+            "-n", "100", "--no-pager"
         ])
         self.assertIn("fetched_at", result)
+
+    def test_logs_reject_unsupported_time_ranges(self):
+        with self.assertRaisesRegex(AdapterError, "Unsupported log time range"):
+            QaCliAdapter(mock=True).logs("arbitrary shell input")
+
+    def test_mock_logs_are_stable_and_cover_main_application_startup(self):
+        adapter = QaCliAdapter(mock=True)
+        startup = adapter.logs("startup")["text"]
+        short_range = adapter.logs("15m")["text"]
+        one_hour = adapter.logs("1h")["text"]
+
+        self.assertIn("Application startup complete", startup)
+        self.assertIn("[ERROR]", startup)
+        self.assertIn("[WARN]", startup)
+        self.assertIn("[INFO]", startup)
+        self.assertNotIn("Application startup complete", short_range)
+        self.assertIn("Diagnostics snapshot published", short_range)
+        self.assertEqual(
+            [line for line in one_hour.splitlines() if line in short_range],
+            short_range.splitlines(),
+        )
+
+    def test_logs_from_startup_query_systemd_active_enter_time(self):
+        with patch.object(
+            QaCliAdapter,
+            "_run",
+            side_effect=["Sun 2026-10-25 12:00:00 CEST", "startup log\n"],
+        ) as run:
+            result = QaCliAdapter().logs("startup")
+
+        self.assertEqual(result["text"], "startup log\n")
+        self.assertEqual(run.call_args_list[0].args[0], "systemctl")
+        self.assertEqual(run.call_args_list[1].args, (
+            "turret-logs",
+            "--since",
+            "Sun 2026-10-25 12:00:00 CEST",
+            "--no-pager",
+        ))
 
     def test_missing_cli_is_reported(self):
         with patch("adapters.qa_cli.shutil.which", return_value=None):
@@ -202,6 +241,18 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual(diagnostics["ros"]["gimbal"]["mode"], "MANUAL")
         self.assertIn("cpu_percent", diagnostics["system"])
         self.assertEqual(info["host"]["os_name"], "Ubuntu (mock)")
+
+    def test_logs_endpoint_accepts_allowlisted_time_range(self):
+        with patch.object(server.Handler.qa, "logs", wraps=server.Handler.qa.logs) as logs:
+            with urlopen(f"{self.base}/api/logs?range=6h") as response:
+                result = json.loads(response.read())
+        self.assertEqual(result["source"], "mock")
+        logs.assert_called_once_with("6h")
+
+    def test_logs_endpoint_rejects_unsupported_time_range(self):
+        with self.assertRaises(HTTPError) as raised:
+            urlopen(f"{self.base}/api/logs?range=unexpected")
+        self.assertEqual(raised.exception.code, 400)
 
     def test_service_actions_run_after_valid_origin(self):
         for action in ("start", "stop", "restart"):

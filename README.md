@@ -13,13 +13,18 @@ read-only four-page React UI with a Python standard-library backend.
   from `turret-status` and `turret-logs`, ROS 2 motor/joint/orchestrator
   telemetry, sensor health, and Linux CPU/RAM/CPU-temperature/disk/uptime
   metrics. Charts sample at 5 Hz and support a synchronized crosshair, pause,
-  and a 30-second to 15-minute time window. Motor current is converted from
+  and a 30-second to 15-minute time window. Overview information is grouped
+  into tower, axis/drive, sensor, and computer/power cards; charts are divided
+  into subtabs. Logs can show entries since the main application started or
+  within a range from 15 minutes to 24 hours. Motor current is converted from
   milliamps to amps; motor voltage and temperature are displayed in volts and
   degrees Celsius. Joint velocities are displayed in degrees per second.
   Battery charge is an explicitly labelled runtime estimate derived from
   voltage, not BMS SOC; a low-charge warning is shown at 20% or below.
   S360 position/velocity charts are hidden until their data source and units
   are confirmed.
+  While hovering, the crosshair stays at a fixed relative position as samples
+  continue to update; measured values appear beside the nearest points.
   Confirmed Start/Stop/Restart actions are limited to the fixed `turret.service`
   unit; report, copy, and export buttons remain placeholders.
 - **Settings** and **Control** — unavailable in Basic.
@@ -65,6 +70,7 @@ Run backend tests and frontend build:
 python3 -m unittest discover -s tests -v
 cd frontend
 npm ci
+npm test
 npm run build
 ```
 

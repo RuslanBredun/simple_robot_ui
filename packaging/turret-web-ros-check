@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$(id -un)" != "turret-web" ]]; then
+    echo "Run this check as the turret-web service user." >&2
+    exit 2
+fi
+
+ENV_FILE=/usr/share/robot/environment/full.env
+if [[ ! -r "$ENV_FILE" ]]; then
+    echo "Robot runtime environment is missing: $ENV_FILE" >&2
+    exit 1
+fi
+
+set -a
+# The runtime generates this file as plain shell-compatible assignments.
+source "$ENV_FILE"
+set +a
+
+: "${ROS_DISTRO:?ROS_DISTRO is missing from $ENV_FILE}"
+: "${ROS_DOMAIN_ID:?ROS_DOMAIN_ID is missing from $ENV_FILE}"
+: "${RMW_IMPLEMENTATION:?RMW_IMPLEMENTATION is missing from $ENV_FILE}"
+
+ROS_SETUP="/opt/ros/${ROS_DISTRO}/setup.bash"
+OVERLAY_SETUP=/opt/robot/ros/local_setup.bash
+if [[ ! -r "$ROS_SETUP" ]]; then
+    echo "ROS setup is missing: $ROS_SETUP" >&2
+    exit 1
+fi
+if [[ ! -r "$OVERLAY_SETUP" ]]; then
+    echo "Robot message overlay is missing: $OVERLAY_SETUP" >&2
+    exit 1
+fi
+
+export ROS_HOME=/var/lib/turret-web/ros
+export ROS_LOG_DIR=/var/lib/turret-web/ros
+source "$ROS_SETUP"
+source "$OVERLAY_SETUP"
+
+python3 -c 'import rclpy; from sensor_msgs.msg import JointState; from std_msgs.msg import Bool; from rob_turret_msgs.msg import CANOpenMotorState, WeaponState; print("Required ROS imports: OK")'
+printf 'ROS_DISTRO=%s ROS_DOMAIN_ID=%s RMW_IMPLEMENTATION=%s\n' \
+    "$ROS_DISTRO" "$ROS_DOMAIN_ID" "$RMW_IMPLEMENTATION"
+echo "Topics visible to turret-web:"
+ros2 topic list -t

@@ -25,16 +25,37 @@ const FIELD_LABELS = {
   OS_NAME: 'Операційна система',
 };
 
+const INFO_GROUPS = [
+  { id: 'product', title: 'Пристрій та продукт', keys: ['MODEL', 'SERIAL'] },
+  { id: 'software', title: 'Версії та програмне забезпечення', keys: ['VERSION', 'BUILD DATE', 'WEB UI VERSION', 'PACKAGE', 'PKG STATUS', 'ROBOT SERVICE'] },
+  { id: 'host', title: 'Комп’ютер', keys: ['HOSTNAME', 'OPERATING SYSTEM', 'ARCHITECTURE', 'OS_NAME'] },
+  { id: 'network', title: 'Мережа', keys: ['MAC ETH0', 'NETWORK INTERFACES'] },
+];
+
 function InfoCards({ fields }) {
-  const entries = Object.entries(fields).filter(([, value]) => value != null && value !== '').map(([label, value]) => [
-    FIELD_LABELS[label] || label,
-    value,
-  ]);
-  if (!entries.length) {
+  const available = Object.fromEntries(
+    Object.entries(fields).filter(([, value]) => value != null && value !== '')
+  );
+  const groups = INFO_GROUPS.map(({ id, title, keys }) => ({
+    id,
+    title,
+    entries: keys.filter((key) => key in available).map((key) => [key, available[key]]),
+  })).filter((group) => group.entries.length);
+  const knownKeys = new Set(INFO_GROUPS.flatMap(({ keys }) => keys));
+  const extraEntries = Object.entries(available).filter(([key]) => !knownKeys.has(key));
+  if (extraEntries.length) {
+    groups.push({ id: 'other', title: 'Інша інформація', entries: extraEntries });
+  }
+  if (!groups.length) {
     return <p className="muted">Команда turret-info не повернула даних.</p>;
   }
-  return <div className="cards">{entries.map(([label, value]) =>
-    <div key={label}><label>{label}</label><strong>{value ?? 'Невідомо'}</strong></div>
+  return <div className="info-groups">{groups.map(({ id, title, entries }) =>
+    <section className="info-group" key={id}>
+      <h3>{title}</h3>
+      <div className="cards">{entries.map(([key, value]) =>
+        <div key={key}><label>{FIELD_LABELS[key] || key}</label><strong>{value}</strong></div>
+      )}</div>
+    </section>
   )}</div>;
 }
 
@@ -100,9 +121,10 @@ export function InfoPage() {
       <ol>
         <li>У вкладці <b>Діагностика</b> → <b>Огляд</b> перевірте стан robot runtime, підключення операторського застосунку та доступність телеметрії.</li>
         <li>В Огляді також доступні статуси приводів і сенсорів та системні показники комп’ютера: CPU, RAM, температура, накопичувач і час роботи.</li>
-        <li>У вкладці <b>Графіки</b> перегляньте позиції, швидкість осей, струм моторів і системні показники. Значення струму показуються в амперах; графіки оновлюються 5 разів на секунду.</li>
+        <li>У вкладці <b>Огляд</b> перемикайте розділи сервісу, стану башти й приводів, сенсорів та комп’ютера.</li>
+        <li>У вкладці <b>Графіки</b> виберіть групу осей, приводів, комп’ютера або батареї. Дані оновлюються 5 разів на секунду.</li>
         <li>На графіках можна вибрати часовий діапазон, призупинити прокручування та навести курсор для точного значення й часу.</li>
-        <li>У вкладці <b>Журнал</b> шукайте записи, фільтруйте їх за рівнем, призупиняйте автооновлення та керуйте автопрокруткою.</li>
+        <li>У вкладці <b>Журнал</b> задайте часовий проміжок, шукайте записи, фільтруйте за рівнем, призупиняйте автооновлення та керуйте автопрокруткою.</li>
         <li>У розділі <b>Огляд</b> доступні команди Start, Stop і Restart для robot runtime. Кожна потребує підтвердження; Stop зупиняє програму, а не є аварійним вимкненням пристрою.</li>
       </ol>
       <p className="muted">Web UI працює окремо від robot runtime і доступний лише локально. Налаштування приводів та керування роботом у Basic недоступні. Інструкції з першого ввімкнення самого виробу потрібно доповнити за його офіційною документацією.</p>

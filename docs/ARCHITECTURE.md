@@ -45,10 +45,17 @@ The systemd launcher sources `/opt/ros/${ROS_DISTRO}` and
 not; only live ROS diagnostics are unavailable. The browser samples cached
 ROS state and system health at 5 Hz and retains up to 15 minutes for charts.
 Charts provide a synchronized crosshair, pause, and time-window selection.
-Service status and latest 100 log lines refresh every 5 seconds. Logs support
-search, level filters, pause, and auto-scroll. System and diagnostic report
-controls, log download/copy, and CSV export are placeholders; there is no
-export endpoint or downloadable report.
+Hovering keeps the crosshair at the same relative chart position while the
+live time window and samples continue to advance. Each series' nearest sample
+value is displayed next to its point. The Overview groups tower, axis/drive,
+sensor, and computer/power status together instead of separate subtabs.
+Service status and logs refresh every 5 seconds. Logs support search, level
+filters, pause, and auto-scroll; they can show records since the main
+`turret.service` activation or use fixed 15-minute, 1-hour, 6-hour, and
+24-hour windows. Time-window queries are limited to 100 lines, while the
+startup query is bounded to the first 100,000 characters. System and
+diagnostic report controls, log download/copy, and CSV export are placeholders;
+there is no export endpoint or downloadable report.
 User-interface warnings use local thresholds of 80 °C CPU temperature and
 less than 10% free space on the root filesystem. These are operational UI
 thresholds, not manufacturer-specified limits. Position/velocity charts are

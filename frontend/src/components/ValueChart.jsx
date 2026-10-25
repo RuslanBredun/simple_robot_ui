@@ -1,4 +1,5 @@
 import React from 'react';
+import { nearestSample } from '../diagnostics.js';
 
 const WIDTH = 720;
 const HEIGHT = 260;
@@ -33,7 +34,7 @@ export function ValueChart({
   series,
   timeRange = 60,
   endAt = Date.now(),
-  cursorAt,
+  cursorRatio,
   onCursorChange,
 }) {
   const plotWidth = WIDTH - PLOT.left - PLOT.right;
@@ -50,20 +51,17 @@ export function ValueChart({
   const yTicks = Array.from({ length: 5 }, (_, index) => min + (max - min) * (index / 4));
   const timeTicks = Array.from({ length: 5 }, (_, index) => timeRange * index / 4);
   const hasPoints = allValues.length > 0;
-  const cursorVisible = cursorAt != null && cursorAt >= startAt && cursorAt <= endAt;
-  const cursorPoints = visibleSeries.map((item) => {
-    const nearest = item.values.reduce((best, point) =>
-      !best || Math.abs(point.at - cursorAt) < Math.abs(best.at - cursorAt) ? point : best
-    , null);
-    return { name: item.name, point: nearest };
-  });
+  const cursorVisible = cursorRatio != null;
+  const cursorAt = cursorVisible
+    ? startAt + cursorRatio * timeRange * 1000
+    : null;
 
   function moveCursor(event) {
     if (!onCursorChange) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     const svgX = (event.clientX - bounds.left) / bounds.width * WIDTH;
     const ratio = Math.max(0, Math.min(1, (svgX - PLOT.left) / plotWidth));
-    onCursorChange(startAt + ratio * timeRange * 1000);
+    onCursorChange(ratio);
   }
 
   return <section className="chart panel" onPointerLeave={() => onCursorChange?.(null)}>
@@ -110,27 +108,14 @@ export function ValueChart({
         const coordinates = item.values.map((point) =>
           `${x(point.at)},${y(point.value)}`
         ).join(' ');
-        const cursorPoint = cursorVisible
-          ? item.values.reduce((best, point) =>
-            !best || Math.abs(point.at - cursorAt) < Math.abs(best.at - cursorAt) ? point : best
-          , null)
-          : null;
-        return <g key={item.name}>
-          <polyline
-            points={coordinates}
-            fill="none"
-            stroke={COLORS[index % COLORS.length]}
-            strokeWidth="2"
-            vectorEffect="non-scaling-stroke"
-          />
-          {cursorPoint && <circle
-            cx={x(cursorPoint.at)}
-            cy={y(cursorPoint.value)}
-            r="4"
-            fill={COLORS[index % COLORS.length]}
-            vectorEffect="non-scaling-stroke"
-          />}
-        </g>;
+        return <polyline
+          key={item.name}
+          points={coordinates}
+          fill="none"
+          stroke={COLORS[index % COLORS.length]}
+          strokeWidth="2"
+          vectorEffect="non-scaling-stroke"
+        />;
       })}
       {cursorVisible && <line
         x1={x(cursorAt)}
@@ -139,19 +124,35 @@ export function ValueChart({
         y2={PLOT.top + plotHeight}
         className="crosshair"
       />}
+      {visibleSeries.map((item, index) => {
+        if (!item.values.length) return null;
+        const cursorPoint = cursorVisible ? nearestSample(item.values, cursorAt) : null;
+        if (!cursorPoint) return null;
+        const pointX = cursorPoint ? x(cursorPoint.at) : 0;
+        const pointY = cursorPoint ? y(cursorPoint.value) : 0;
+        const labelX = pointX > WIDTH - 120 ? pointX - 8 : pointX + 8;
+        const labelY = Math.max(
+          PLOT.top + 12,
+          Math.min(PLOT.top + plotHeight - 4, pointY - 9 - index * 12)
+        );
+        return <g key={`cursor-${item.name}`}>
+          <circle
+            cx={pointX}
+            cy={pointY}
+            r="4"
+            fill={COLORS[index % COLORS.length]}
+            vectorEffect="non-scaling-stroke"
+          />
+          <text
+            x={labelX}
+            y={labelY}
+            textAnchor={pointX > WIDTH - 120 ? 'end' : 'start'}
+            className="crosshair-value"
+            fill={COLORS[index % COLORS.length]}
+          >{cursorPoint.value.toFixed(3)}</text>
+        </g>;
+      })}
     </svg>
-    {cursorVisible && <div className="chart-tooltip">
-      <strong>{new Date(cursorAt).toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })}</strong>
-      {cursorPoints.map(({ name, point }, index) =>
-        <span key={name} style={{ color: COLORS[index % COLORS.length] }}>
-          {name}: {point ? `${point.value.toFixed(3)} ${unit}` : 'немає даних'}
-        </span>
-      )}
-    </div>}
     {!hasPoints && <p className="muted chart-empty">Очікування даних телеметрії…</p>}
     <div className="legend">{visibleSeries.map((item, index) => {
       const value = item.values.at(-1)?.value;

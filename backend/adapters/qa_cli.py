@@ -1,17 +1,56 @@
 """Adapters for the read-only QA commands installed by the robot runtime."""
+import os
 import re
 import shutil
 import subprocess
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 
 class AdapterError(RuntimeError):
     pass
 
 
+LOG_RANGES = {
+    "startup": None,
+    "15m": "15 minutes ago",
+    "1h": "1 hour ago",
+    "6h": "6 hours ago",
+    "24h": "24 hours ago",
+}
+MOCK_LOG_RANGE_DURATIONS = {
+    "15m": timedelta(minutes=15),
+    "1h": timedelta(hours=1),
+    "6h": timedelta(hours=6),
+    "24h": timedelta(hours=24),
+}
+MOCK_LOG_ENTRIES = (
+    (timedelta(0), "turret_main[1234]: [INFO] Application startup complete; model=mock_turret"),
+    (timedelta(minutes=15), "canopen_manager[1238]: [INFO] CAN bus initialized; 4 devices detected"),
+    (timedelta(hours=1), "axis_controller[1241]: [INFO] X and Y axes are ready"),
+    (timedelta(hours=3), "sensor_bridge[1250]: [WARN] IMU data delayed by 120 ms"),
+    (timedelta(hours=6), "turret_main[1234]: [INFO] Operator connection established"),
+    (timedelta(hours=10), "axis_controller[1241]: [WARN] Following error elevated on Y axis"),
+    (timedelta(hours=11), "battery_monitor[1257]: [INFO] Battery voltage 25.1 V"),
+    (timedelta(hours=11, minutes=15), "sensor_bridge[1250]: [ERROR] Camera frame timeout; reconnecting"),
+    (timedelta(hours=11, minutes=45), "sensor_bridge[1250]: [INFO] Camera stream restored"),
+    (timedelta(hours=11, minutes=52), "turret_main[1234]: [INFO] Operation state changed to IDLE"),
+    (timedelta(hours=11, minutes=56), "canopen_manager[1238]: [WARN] Motor temperature reached 58.2 C"),
+    (timedelta(hours=11, minutes=59), "turret_main[1234]: [INFO] Diagnostics snapshot published"),
+)
+
+
 class QaCliAdapter:
     def __init__(self, mock=False):
         self.mock = mock
+        self._mock_logs_at = datetime.now(timezone.utc)
+        self._mock_logs_started_at = self._mock_logs_at - timedelta(hours=12)
+        self._mock_logs = [
+            (
+                self._mock_logs_started_at + elapsed,
+                f"{(self._mock_logs_started_at + elapsed).isoformat()} robot {message}",
+            )
+            for elapsed, message in MOCK_LOG_ENTRIES
+        ]
 
     def _run(self, command, *args):
         executable = shutil.which(command)
@@ -70,17 +109,36 @@ class QaCliAdapter:
             return {"source": "mock", "text": output}
         return {"source": "turret-status", "text": self._run("turret-status")}
 
-    def logs(self):
+    def logs(self, time_range="1h"):
+        if time_range not in LOG_RANGES:
+            raise AdapterError("Unsupported log time range")
         if self.mock:
-            output = (
-                "2026-01-01T00:00:00+00:00 robot mock_node[1234]: [INFO] Mock diagnostics active\n"
-                "2026-01-01T00:00:01+00:00 robot mock_node[1234]: [WARN] Synthetic warning example\n"
+            since = self._mock_logs_started_at if time_range == "startup" else (
+                self._mock_logs_at - MOCK_LOG_RANGE_DURATIONS[time_range]
             )
+            output = "\n".join(
+                line for timestamp, line in self._mock_logs if timestamp >= since
+            )
+            if output:
+                output += "\n"
             return {"source": "mock", "text": output, "fetched_at": _now()}
-        output = self._run("turret-logs", "-n", "100", "--no-pager")
+        since = LOG_RANGES[time_range]
+        if time_range == "startup":
+            service = os.environ.get("ROBOT_SERVICE_NAME", "turret.service")
+            since = self._run(
+                "systemctl", "show", "--property=ActiveEnterTimestamp", "--value", service
+            ).strip()
+            if not since or since.lower() == "n/a":
+                raise AdapterError(f"Could not determine the last start time of {service}")
+        args = ["--since", since]
+        if time_range != "startup":
+            args.extend(["-n", "100"])
+        output = self._run(
+            "turret-logs", *args, "--no-pager"
+        )
         return {
             "source": "turret-logs",
-            "text": output[-100000:],
+            "text": output[:100000] if time_range == "startup" else output[-100000:],
             "fetched_at": _now(),
         }
 

@@ -7,9 +7,9 @@ import subprocess
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
-from adapters.qa_cli import AdapterError, QaCliAdapter
+from adapters.qa_cli import LOG_RANGES, AdapterError, QaCliAdapter
 from adapters.ros_diagnostics import RosDiagnosticsAdapter
 from adapters.system_metrics import SystemMetricsAdapter
 
@@ -113,8 +113,11 @@ class Handler(BaseHTTPRequestHandler):
                     "mock": MOCK_MODE,
                 })
             if path == "/api/logs":
+                log_range = parse_qs(urlparse(self.path).query).get("range", ["1h"])[0]
+                if log_range not in LOG_RANGES:
+                    return self.respond(400, {"error": "Unsupported log time range"})
                 return self.respond(200, {
-                    **self.qa.logs(),
+                    **self.qa.logs(log_range),
                     "mock": MOCK_MODE,
                 })
             if path == "/api/diagnostics":

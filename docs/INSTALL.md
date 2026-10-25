@@ -35,6 +35,38 @@ in `/usr/share/robot/environment/full.env`, and the robot overlay must exist
 at `/opt/robot/ros`. If ROS is unavailable, the web service still starts and
 reports that telemetry is unavailable.
 
+The runtime packaging script generates `full.env` with `ROS_DISTRO` (default
+`jazzy`), `ROS_DOMAIN_ID` (default `10`), and
+`RMW_IMPLEMENTATION` (default `rmw_fastrtps_cpp`). The runtime DEB depends on
+`ros-jazzy-ros-base` and packages its custom message overlay under
+`/opt/robot/ros`. The Web UI DEB depends on `rob-app`, so its required ROS
+runtime and custom messages must be installed, though `turret.service` may be
+stopped.
+
+After installation, verify ROS visibility in the service log and UI:
+
+```bash
+sudo systemctl restart turret-web.service
+sudo journalctl -u turret-web.service -n 100 --no-pager
+curl -s http://127.0.0.1:8080/api/diagnostics
+```
+
+Run the packaged preflight as the service user to verify required imports and
+inspect topics visible in its ROS domain:
+
+```bash
+sudo -u turret-web /usr/bin/turret-web-ros-check
+```
+
+The web service also performs the ROS imports and subscriptions as `turret-web`.
+A failed required import is returned as an explicit ROS-unavailable error;
+absent topic publishers appear as missing/stale data in Diagnostics. The
+preflight lists topics but does not fail when publishers are absent, since the
+runtime may be stopped. This source workspace does not contain the deployed
+`full.env` or `/opt/robot/ros` overlay, and does not have the `turret-web`
+account, so the service-user check must be completed on a device with the
+robot DEB installed.
+
 The Overview tab provides confirmed Start, Stop, and Restart actions for
 `turret.service`. Mock Mode disables all service actions.
 The Info tab also shows non-loopback IPv4 addresses detected on the device.
@@ -53,8 +85,10 @@ not manufacturer-specified limits.
 - Missing product information or logs: confirm the runtime package is installed
   and the three `turret-*` commands are available in the service user's `PATH`.
 - ROS data unavailable: inspect `journalctl -u turret-web.service`, verify ROS
-  2 and `/opt/robot/ros` are installed, then check whether this model publishes
-  the configured topics. `/joint_states` may not be published by every model.
+  2 and `/opt/robot/ros` are installed, check `ROS_DISTRO`, `ROS_DOMAIN_ID`,
+  and `RMW_IMPLEMENTATION` in `/usr/share/robot/environment/full.env`, then
+  check whether this model publishes the configured topics.
+  `/joint_states` may not be published by every model.
 - Empty logs: confirm `turret-web` is a member of `systemd-journal` and restart
   `turret-web.service` after a group membership change.
 - Service action rejected: confirm `/etc/sudoers.d/turret-web` grants only

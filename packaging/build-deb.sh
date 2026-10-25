@@ -5,12 +5,14 @@ VERSION="${VERSION:-0.4.0}"
 test -f "$ROOT/frontend/dist/index.html" || { echo "Build frontend first: npm run build" >&2; exit 1; }
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
-mkdir -p "$STAGE/DEBIAN" "$STAGE/opt/turret-web/static" "$STAGE/lib/systemd/system" "$STAGE/etc/sudoers.d" "$ROOT/dist"
+mkdir -p "$STAGE/DEBIAN" "$STAGE/opt/turret-web/static" "$STAGE/lib/systemd/system" "$STAGE/etc/sudoers.d" "$STAGE/usr/bin" "$ROOT/dist"
 cp "$ROOT/backend/server.py" "$STAGE/opt/turret-web/server.py"
 mkdir -p "$STAGE/opt/turret-web/adapters"
 cp "$ROOT"/backend/adapters/*.py "$STAGE/opt/turret-web/adapters/"
 cp "$ROOT/packaging/start.sh" "$STAGE/opt/turret-web/start.sh"
 chmod 0755 "$STAGE/opt/turret-web/start.sh"
+cp "$ROOT/packaging/turret-web-ros-check" "$STAGE/usr/bin/turret-web-ros-check"
+chmod 0755 "$STAGE/usr/bin/turret-web-ros-check"
 cp -a "$ROOT/frontend/dist/." "$STAGE/opt/turret-web/static/"
 cp "$ROOT/packaging/turret-web.service" "$STAGE/lib/systemd/system/"
 cp "$ROOT/packaging/turret-web.sudoers" "$STAGE/etc/sudoers.d/turret-web"
@@ -22,7 +24,7 @@ Architecture: all
 Section: admin
 Priority: optional
 Maintainer: Robot UI Team <noreply@example.invalid>
-Depends: python3, systemd, sudo, adduser
+Depends: python3, systemd, sudo, adduser, rob-app
 Description: Local maintenance interface for turret.service
 EOF
 cat > "$STAGE/DEBIAN/postinst" <<'EOF'
