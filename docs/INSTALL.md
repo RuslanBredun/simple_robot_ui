@@ -16,7 +16,7 @@ systemctl status turret.service
 Download the `turret-web-deb` artifact from GitHub Actions:
 
 ```bash
-sudo apt install ./turret-web_0.4.0_all.deb
+sudo apt install ./turret-web_0.5.0_all.deb
 sudo systemctl status turret-web.service
 journalctl -u turret-web.service -n 50 --no-pager
 curl http://127.0.0.1:8080/api/status
@@ -99,13 +99,14 @@ No factory AP setup, login, or TLS yet.
 
 ## Control prototype
 
-The Control page is a mock-only v0.5 preview. Camera/profile and tool/mode
-selections, joystick axes, and Motion Enable/Slow Mode switches change local
-UI state only. Device status is explicitly unavailable. There is no RTSP
+The Control page displays live, read-only ROS diagnostics for operator
+connection, turret mode, and weapon mode. Status older than two seconds is
+shown as unavailable; `/connection_status` is aggregated and cannot identify
+the active source or control owner. Camera/profile and tool/mode selections,
+joystick axes, and Enable/Slow switches remain local UI state only.
+Run Homing, fuse, and activation buttons are disabled. There is no RTSP
 playback, ROS command publisher, homing service call, tool activation, or
 device-side control handling; no additional target dependency is required.
-Connection and device status labels are fixed preview placeholders, not live
-backend or ROS state.
 Settings remains unavailable.
 
 The ROS workspace currently has no `WEB_UI` source registration or shared

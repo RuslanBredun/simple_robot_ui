@@ -87,7 +87,7 @@ class QaCliAdapter:
             return {
                 "source": "mock",
                 "fields": {
-                    "VERSION": "0.4.0-dev",
+                    "VERSION": "0.5.0-dev",
                     "MODEL": "mock_turret",
                     "BUILD DATE": "2026-01-01",
                     "SERIAL": "MOCK-0000",

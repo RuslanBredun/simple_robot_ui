@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { api } from '../api.js';
 import { CameraPanel } from '../components/control/CameraPanel.jsx';
 import { ControlStatusPanel } from '../components/control/ControlStatusPanel.jsx';
 import { JoystickPanel } from '../components/control/JoystickPanel.jsx';
@@ -14,14 +15,39 @@ export function ControlPage() {
   const [slowMode, setSlowMode] = useState(false);
   const [motionEnabled, setMotionEnabled] = useState(false);
   const [axes, setAxes] = useState({ yaw: 0, pitch: 0 });
+  const [diagnostics, setDiagnostics] = useState(null);
+  const [diagnosticsError, setDiagnosticsError] = useState(false);
+
+  useEffect(() => {
+    let stopped = false;
+    let timer;
+
+    async function refreshDiagnostics() {
+      try {
+        const data = await api('diagnostics');
+        if (!stopped) {
+          setDiagnostics(data.ros);
+          setDiagnosticsError(false);
+        }
+      } catch {
+        if (!stopped) setDiagnosticsError(true);
+      }
+      if (!stopped) timer = window.setTimeout(refreshDiagnostics, 1000);
+    }
+
+    refreshDiagnostics();
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+    };
+  }, []);
 
   return <section className="panel control-panel">
     <div className="line panel-heading">
-      <div><div className="tag">CONTROL · MOCK PREVIEW</div><h2>Сервісна панель</h2></div>
-      <span className="control-demo-label">Локальний макет · без команд і відео</span>
+      <div><div className="tag">LIVE STATUS · COMMANDS MOCK-ONLY</div><h2>Керування</h2></div>
     </div>
-    <ControlStatusPanel />
-    <div className="control-layout">
+    <div className="control-workspace">
+      <ControlStatusPanel diagnostics={diagnostics} unavailable={diagnosticsError} />
       <CameraPanel
         camera={camera}
         onCameraChange={setCamera}
@@ -30,22 +56,24 @@ export function ControlPage() {
         cameras={CAMERAS}
         profiles={STREAM_PROFILES}
       />
-      <div className="control-side">
+      <div className="control-panels">
         <JoystickPanel axes={axes} onAxesChange={setAxes} />
-        <MotionPanel
-          motionEnabled={motionEnabled}
-          onMotionChange={setMotionEnabled}
-          slowMode={slowMode}
-          onSlowModeChange={setSlowMode}
-        />
-        <ToolPanel
-          tool={tool}
-          onToolChange={setTool}
-          mode={mode}
-          onModeChange={setMode}
-          tools={TOOL_IDS}
-          modes={TOOL_MODES}
-        />
+        <div className="control-right-stack">
+          <MotionPanel
+            motionEnabled={motionEnabled}
+            onMotionChange={setMotionEnabled}
+            slowMode={slowMode}
+            onSlowModeChange={setSlowMode}
+          />
+          <ToolPanel
+            tool={tool}
+            onToolChange={setTool}
+            mode={mode}
+            onModeChange={setMode}
+            tools={TOOL_IDS}
+            modes={TOOL_MODES}
+          />
+        </div>
       </div>
     </div>
   </section>;

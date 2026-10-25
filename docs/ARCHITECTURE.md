@@ -80,14 +80,19 @@ policy.
 ## v0.5 Control mock preview and integration boundary
 
 `frontend/src/pages/ControlPage.jsx` composes separate camera, joystick, motion,
-tool, and status-preview components. Camera/profile and tool/mode selections,
-joystick axes in `[-1, 1]`, and Motion Enable/Slow Mode switches are local UI
-state only. Slow Mode does not scale joystick values. Homing is disabled.
-Device status is shown as unavailable; preview state is never presented as
-hardware telemetry. The page has no ROS command publisher, control API, RTSP
-playback, or tool activation path.
-The status cards are fixed preview labels; they do not query
-`/api/diagnostics` or reflect device connectivity.
+tool, and status components. The layout places full-width status cards
+above the central video placeholder. Below the video, the joystick occupies
+one column; the other column stacks Motion buttons above Tool selectors and
+actions. Enable and Slow are local toggles in the separate Motion panel. Run
+Homing, fuse, and activation buttons are disabled. Camera/profile and
+tool/mode selections, joystick axes in `[-1, 1]`, and toggles are local UI
+state only. Slow Mode does not scale joystick values. The status cards poll
+`/api/diagnostics` and show fresh `/connection_status`, `/gimbal_state`, and
+`/weapon_state` values; samples older than the existing two-second freshness
+threshold are shown as unavailable. The aggregated connection topic does not
+identify its source, so the UI explicitly reports source ownership as unknown.
+The page has no ROS command publisher, control API, RTSP playback, or tool
+activation path.
 
 Source inspection in `/home/ubuntu/ros2_ws` confirmed ROS command and telemetry
 contracts exist, but this web package does not integrate with them. The
@@ -96,9 +101,10 @@ AntiBug and Hmarka connection paths; `/antibug/control_active` is a separate
 AntiBug control-activity signal. The ROS workspace does not expose a
 `WEB_UI` connection registration, heartbeat, or explicit shared control-owner
 lease that this web service can safely use. The existing priority manager's
-UDP source tracking is not a web-facing ownership API. Do not treat browser
-activity, backend-to-ROS availability, source connection, and control
-ownership as equivalent states.
+UDP source tracking is not a web-facing ownership API. The UI therefore does
+not register or claim WEB_UI ownership. Do not treat browser activity,
+backend-to-ROS availability, source connection, and control ownership as
+equivalent states.
 
 The workspace contains RTSP camera URLs for a particular Hmarka K2
 configuration, but no browser-compatible video gateway. The configuration

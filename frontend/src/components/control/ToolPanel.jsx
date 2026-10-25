@@ -2,9 +2,9 @@ import React from 'react';
 
 export function ToolPanel({ tool, onToolChange, mode, onModeChange, tools, modes }) {
   return <section className="control-block">
-    <h3>Tool · mock</h3>
-    <div className="control-selects">
-      <label>Tool ID
+    <h3>Weapon</h3>
+    <div className="control-tool-selects">
+      <label>Tool
         <select value={tool} onChange={(event) => onToolChange(Number(event.target.value))}>
           {tools.map((item) => <option key={item} value={item}>Tool {item}</option>)}
         </select>
@@ -15,7 +15,9 @@ export function ToolPanel({ tool, onToolChange, mode, onModeChange, tools, modes
         </select>
       </label>
     </div>
-    <p className="muted">Вибір локальний; стани окремих інструментів у preview не надходять.</p>
-    <p className="muted">Запобіжник та активація не мають елементів керування.</p>
+    <div className="control-tool-buttons">
+      <button type="button" disabled title="Unavailable in mock preview">Fuse</button>
+      <button type="button" disabled title="Activation unavailable in mock preview">Activate</button>
+    </div>
   </section>;
 }

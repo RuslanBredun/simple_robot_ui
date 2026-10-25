@@ -1,6 +1,6 @@
 # Simple Robot UI
 
-Local offline maintenance interface for an Ubuntu/ROS 2 robot. v0.4 Basic is a
+Local offline maintenance interface for an Ubuntu/ROS 2 robot. v0.5 Basic is a
 read-only four-page React UI with a Python standard-library backend.
 
 ## Scope
@@ -31,7 +31,7 @@ read-only four-page React UI with a Python standard-library backend.
   continue to update; measured values appear beside the nearest points.
   Confirmed Start/Stop/Restart actions are limited to the fixed `turret.service`
   unit; report, copy, and export buttons remain placeholders.
-- **Control** — v0.5 mock-only preview: camera/profile selectors, a local normalized joystick display, Motion Enable/Slow Mode preview toggles, disabled Homing, and local tool/mode selectors. Device status is explicitly unavailable; no ROS commands, control-source registration, tool activation, or live video are connected.
+- **Control** — live, read-only turret/weapon/connection status from ROS diagnostics, alongside local camera/profile selectors, normalized joystick preview, Enable/Slow toggles, and tool/mode selectors. Homing, fuse, and activation actions are disabled. No ROS commands, control-source registration, tool activation, or live video are connected.
 - **Settings** — unavailable.
 
 The server listens on **127.0.0.1:8080 only**. Service actions are available
@@ -42,14 +42,14 @@ to untrusted networks.
 
 ## Installation (offline on Raspberry Pi / Ubuntu)
 
-1. Download `turret-web_0.4.0_all.deb` from the GitHub Actions **Build DEB**
+1. Download `turret-web_0.5.0_all.deb` from the GitHub Actions **Build DEB**
    run artifacts.
 2. Verify that the robot runtime and `python3`, `systemd`, and `adduser` are
    installed.
 3. Install:
 
    ```bash
-   sudo apt install ./turret-web_0.4.0_all.deb
+   sudo apt install ./turret-web_0.5.0_all.deb
    sudo systemctl status turret-web.service
    ```
 

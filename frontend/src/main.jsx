@@ -32,7 +32,7 @@ function App() {
   return <div className="shell">
     <aside className="nav">
       <div className="brand">ROBOT <span>UI</span></div>
-      <div className="sub">ЛОКАЛЬНЕ ОБСЛУГОВУВАННЯ · v0.4</div>
+      <div className="sub">ЛОКАЛЬНЕ ОБСЛУГОВУВАННЯ · v0.5</div>
       <nav aria-label="Головна навігація">{pages.map(({ id, label }) =>
         <button
           className={id === page ? 'selected' : ''}
