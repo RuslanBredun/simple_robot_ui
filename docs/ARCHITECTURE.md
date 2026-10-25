@@ -86,6 +86,8 @@ state only. Slow Mode does not scale joystick values. Homing is disabled.
 Device status is shown as unavailable; preview state is never presented as
 hardware telemetry. The page has no ROS command publisher, control API, RTSP
 playback, or tool activation path.
+The status cards are fixed preview labels; they do not query
+`/api/diagnostics` or reflect device connectivity.
 
 Source inspection in `/home/ubuntu/ros2_ws` confirmed ROS command and telemetry
 contracts exist, but this web package does not integrate with them. The

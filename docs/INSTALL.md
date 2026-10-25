@@ -104,6 +104,8 @@ selections, joystick axes, and Motion Enable/Slow Mode switches change local
 UI state only. Device status is explicitly unavailable. There is no RTSP
 playback, ROS command publisher, homing service call, tool activation, or
 device-side control handling; no additional target dependency is required.
+Connection and device status labels are fixed preview placeholders, not live
+backend or ROS state.
 Settings remains unavailable.
 
 The ROS workspace currently has no `WEB_UI` source registration or shared
