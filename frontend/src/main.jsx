@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { api } from './api.js';
 import { DiagnosticsPage } from './pages/DiagnosticsPage.jsx';
 import { InfoPage } from './pages/InfoPage.jsx';
+import { ControlPage } from './pages/ControlPage.jsx';
 import './style.css';
 
 const pages = [
@@ -40,7 +41,7 @@ function App() {
           aria-current={id === page ? 'page' : undefined}
         >
           {label}
-          {(id === 'Settings' || id === 'Control') && <small>Extended</small>}
+          {id === 'Settings' && <small>Extended</small>}
         </button>
       )}</nav>
       <div className="bottom">Basic · лише читання · localhost</div>
@@ -54,7 +55,8 @@ function App() {
       {healthError && <p className="error" role="alert">Помилка перевірки backend: {healthError}</p>}
       {page === 'Info' && <InfoPage />}
       {page === 'Diagnostics' && <DiagnosticsPage />}
-      {(page === 'Settings' || page === 'Control') && <section className="panel">
+      {page === 'Control' && <ControlPage />}
+      {page === 'Settings' && <section className="panel">
         <div className="tag">РОЗШИРЕНА ВЕРСІЯ</div>
         <h2>{pageLabels[page]} — недоступно у Basic</h2>
         <p>Ця сторінка недоступна в поточній версії.</p>

@@ -96,3 +96,7 @@ not manufacturer-specified limits.
   `journalctl -u turret-web.service`.
 
 No factory AP setup, login, or TLS yet.
+
+## Control prototype
+
+The Control page is a layout-only v0.5 preview. Camera and tool selections and Motion Enable/Slow Mode switches change local UI state only. There is no RTSP playback, joystick publishing, homing, tool activation, or device-side command handling. It can be reviewed offline without any new target dependencies. Settings remains unavailable.

@@ -76,3 +76,11 @@ is temporary.
 Future milestones: firmware inventory, richer ROS diagnostics, safe
 configuration editing, Extended operator control, and Factory/Field AP access
 policy.
+
+## v0.5 Control layout prototype
+
+`frontend/src/pages/ControlPage.jsx` is a single-page tester UI using the same visual language as Info/Diagnostics. Video stays visible alongside motion and tool status. Camera 1/2 and High/Medium/Low are local selections only; browsers cannot consume RTSP natively. A video gateway and verified stream configuration are pending.
+
+The joystick is deliberately inactive; Motion Enable and Slow Mode are local-only visual states, not commands. Slow Mode must eventually be represented as a separate flag, without reducing the joystick's normalized full range. Homing is disabled. Tool IDs 1/2/3/5 and tool modes 1/2/3 are selectable locally; safety and activation are read-only, and no actuation interface is exposed.
+
+Integration note for the next agent: the user identified three candidate ROS 2 topic families — `turret control`, `turret fire`, `turret move`. These are **unverified names/contracts**, not implemented publishers. Before any connection, inspect actual message definitions, topic names, ownership, permission and interlock behavior, then ask the user about unresolved fields. Never infer command payloads or report a UI toggle as actual device state. For this prototype, no backend or ROS 2 command endpoints are added.

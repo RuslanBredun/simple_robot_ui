@@ -31,7 +31,8 @@ read-only four-page React UI with a Python standard-library backend.
   continue to update; measured values appear beside the nearest points.
   Confirmed Start/Stop/Restart actions are limited to the fixed `turret.service`
   unit; report, copy, and export buttons remain placeholders.
-- **Settings** and **Control** — unavailable in Basic.
+- **Control** — v0.5 layout preview: single camera panel, camera/quality selectors, inactive joystick, local Motion Enable/Slow Mode toggles, disabled Homing, tool IDs 1/2/3/5 and modes 1/2/3. No video or device command integration yet. Tool safety/activation are status-only.
+- **Settings** — unavailable.
 
 The server listens on **127.0.0.1:8080 only**. Service actions are available
 only in the Overview tab, require confirmation, and are allowlisted to
