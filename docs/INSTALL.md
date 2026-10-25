@@ -35,8 +35,17 @@ in `/usr/share/robot/environment/full.env`, and the robot overlay must exist
 at `/opt/robot/ros`. If ROS is unavailable, the web service still starts and
 reports that telemetry is unavailable.
 
-The Service tab provides confirmed Start, Stop, and Restart actions for
+The Overview tab provides confirmed Start, Stop, and Restart actions for
 `turret.service`. Mock Mode disables all service actions.
+The Info tab also shows non-loopback IPv4 addresses detected on the device.
+
+System health metrics are read locally from Linux `/proc`, `/sys`, and
+filesystem statistics. CPU temperature is shown only when an explicitly
+identified CPU/SoC sensor is available. Main-battery charge is shown as a
+runtime estimate derived from voltage, not as BMS SOC. Warnings are raised at
+20% estimated battery charge, 80 °C CPU temperature, or less than 10% free
+space on the root filesystem; temperature and disk thresholds are UI defaults,
+not manufacturer-specified limits.
 
 ## Troubleshooting
 

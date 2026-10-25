@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 import server
 from adapters.qa_cli import AdapterError, QaCliAdapter
 from adapters.ros_diagnostics import RosDiagnosticsAdapter
+from adapters.system_metrics import SystemMetricsAdapter
 
 
 class QaCliTests(unittest.TestCase):
@@ -60,6 +61,9 @@ class RosDiagnosticsTests(unittest.TestCase):
             alarm_code = 0
             status_word = 4660
             state = 3
+            operational = True
+            motor_fault_alarm = False
+            battery_power_down_alarm = False
 
         class MotorMessage:
             telemetry = Telemetry()
@@ -73,10 +77,35 @@ class RosDiagnosticsTests(unittest.TestCase):
         adapter._motor_callback("/x_axis/state", MotorMessage())
         adapter._joint_callback(JointMessage())
         result = adapter.snapshot()
-        self.assertEqual(result["motors"]["/x_axis/state"]["current"], 35)
+        self.assertEqual(result["motors"]["/x_axis/state"]["current"], 0.035)
+        self.assertEqual(result["motors"]["/x_axis/state"]["voltage"], 24)
+        self.assertEqual(result["motors"]["/x_axis/state"]["temperature"], 31)
         self.assertEqual(result["motors"]["/x_axis/state"]["state"], 3)
+        self.assertEqual(result["motors"]["/x_axis/state"]["drive_status"], "READY")
         self.assertEqual(result["joints"]["turret_yaw_joint"]["position"], 0.5)
         self.assertLessEqual(result["joints"]["turret_yaw_joint"]["age_seconds"], 1)
+
+    def test_battery_voltage_and_sensor_health_are_normalized(self):
+        adapter = RosDiagnosticsAdapter()
+        adapter._battery_callback(SimpleNamespace(
+            battery_voltage=2450,
+            battery_percent=72.0,
+            is_live=True,
+        ))
+        adapter._sensor_health_callback(SimpleNamespace(
+            aggregated_state=3,
+            sensor_states=[
+                SimpleNamespace(name="base_imu", state=2),
+                SimpleNamespace(name="rangefinder", state=4),
+            ],
+        ))
+
+        result = adapter.snapshot()
+        self.assertEqual(result["battery"]["voltage_v"], 24.5)
+        self.assertEqual(result["battery"]["charge_percent"], 72.0)
+        self.assertTrue(result["battery"]["is_live"])
+        self.assertEqual(result["sensors"]["aggregated_state"], "DEGRADED")
+        self.assertEqual(result["sensors"]["items"][1]["state"], "FAILED")
 
     def test_missing_ros_is_explicitly_unavailable(self):
         adapter = RosDiagnosticsAdapter()
@@ -103,6 +132,18 @@ class RosDiagnosticsTests(unittest.TestCase):
         self.assertNotEqual(
             first["joints"]["turret_yaw_joint"]["position"],
             second["joints"]["turret_yaw_joint"]["position"],
+        )
+        self.assertNotEqual(
+            first["motors"]["/x_axis/state"]["voltage"],
+            second["motors"]["/x_axis/state"]["voltage"],
+        )
+        self.assertNotEqual(
+            first["motors"]["/x_axis/state"]["temperature"],
+            second["motors"]["/x_axis/state"]["temperature"],
+        )
+        self.assertNotEqual(
+            first["battery"]["charge_percent"],
+            second["battery"]["charge_percent"],
         )
 
     def test_connection_weapon_and_gimbal_states_are_exposed(self):
@@ -137,6 +178,7 @@ class HttpApiTests(unittest.TestCase):
         server.PORT = cls.httpd.server_address[1]
         server.Handler.qa = QaCliAdapter(mock=True)
         server.Handler.ros = RosDiagnosticsAdapter(mock=True)
+        server.Handler.system = SystemMetricsAdapter(mock=True)
         server.Handler.ros.start()
         cls.thread = threading.Thread(target=cls.httpd.serve_forever, daemon=True)
         cls.thread.start()
@@ -158,6 +200,8 @@ class HttpApiTests(unittest.TestCase):
         self.assertTrue(diagnostics["ros"]["available"])
         self.assertTrue(diagnostics["ros"]["connection"]["connected"])
         self.assertEqual(diagnostics["ros"]["gimbal"]["mode"], "MANUAL")
+        self.assertIn("cpu_percent", diagnostics["system"])
+        self.assertEqual(info["host"]["os_name"], "Ubuntu (mock)")
 
     def test_service_actions_run_after_valid_origin(self):
         for action in ("start", "stop", "restart"):
@@ -225,19 +269,30 @@ class HttpApiTests(unittest.TestCase):
             urlopen(request)
         self.assertEqual(raised.exception.code, 404)
 
-    def test_report_is_downloadable_json(self):
-        with urlopen(f"{self.base}/api/diagnostics/export") as response:
-            report = json.loads(response.read())
-            disposition = response.headers["Content-Disposition"]
-        self.assertIn("robot-diagnostics-", disposition)
-        self.assertIn("logs", report["sections"])
-        self.assertIn("ros", report["sections"])
+    def test_diagnostic_export_is_not_available(self):
+        with self.assertRaises(HTTPError) as raised:
+            urlopen(f"{self.base}/api/diagnostics/export")
+        self.assertEqual(raised.exception.code, 404)
 
     def test_unrecognized_host_is_rejected(self):
         request = Request(f"{self.base}/api/health", headers={"Host": "attacker.example"})
         with self.assertRaises(HTTPError) as raised:
             urlopen(request)
         self.assertEqual(raised.exception.code, 403)
+
+
+class SystemMetricsTests(unittest.TestCase):
+    def test_mock_metrics_include_chart_and_overview_values(self):
+        adapter = SystemMetricsAdapter(mock=True)
+        result = adapter.snapshot()
+        self.assertGreaterEqual(result["cpu_percent"], 0)
+        self.assertGreater(result["memory_total_bytes"], 0)
+        self.assertGreater(result["disk_total_bytes"], 0)
+        self.assertGreater(result["uptime_seconds"], 0)
+        self.assertEqual(result["errors"], {})
+        identity = adapter.identity()
+        self.assertEqual(identity["network_interfaces"][0]["name"], "eth0")
+        self.assertEqual(identity["network_interfaces"][0]["ipv4_address"], "192.168.1.42")
 
 
 if __name__ == "__main__":

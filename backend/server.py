@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 from adapters.qa_cli import AdapterError, QaCliAdapter
 from adapters.ros_diagnostics import RosDiagnosticsAdapter
+from adapters.system_metrics import SystemMetricsAdapter
 
 HOST = os.environ.get("TURRET_WEB_HOST", "127.0.0.1")
 PORT = int(os.environ.get("TURRET_WEB_PORT", "8080"))
@@ -49,6 +50,7 @@ def service_action(action):
 class Handler(BaseHTTPRequestHandler):
     qa = QaCliAdapter(mock=MOCK_MODE)
     ros = RosDiagnosticsAdapter(mock=MOCK_MODE)
+    system = SystemMetricsAdapter(mock=MOCK_MODE)
 
     def respond(self, code, payload, headers=None):
         data = json.dumps(payload).encode("utf-8")
@@ -102,6 +104,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/info":
                 return self.respond(200, {
                     **self.qa.info(),
+                    "host": self.system.identity(),
                     "mock": MOCK_MODE,
                 })
             if path == "/api/status":
@@ -117,37 +120,13 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/diagnostics":
                 return self.respond(200, {
                     "ros": self.ros.snapshot(),
+                    "system": self.system.snapshot(),
                     "sampled_at": datetime.now(timezone.utc).isoformat(),
                     "mock": MOCK_MODE,
-                })
-            if path == "/api/diagnostics/export":
-                report = self.diagnostic_report()
-                filename = f"robot-diagnostics-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}.json"
-                return self.respond(200, report, {
-                    "Content-Disposition": f'attachment; filename="{filename}"',
                 })
         except AdapterError as exc:
             return self.respond(503, {"error": str(exc)})
         return self.respond(404, {"error": "Not found"})
-
-    def diagnostic_report(self):
-        result = {
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "mock": MOCK_MODE,
-            "notice": "This report contains product identifiers and recent service logs.",
-            "sections": {},
-        }
-        for name, read in (
-            ("info", self.qa.info),
-            ("service", self.qa.status),
-            ("logs", self.qa.logs),
-        ):
-            try:
-                result["sections"][name] = read()
-            except AdapterError as exc:
-                result["sections"][name] = {"available": False, "error": str(exc)}
-        result["sections"]["ros"] = self.ros.snapshot()
-        return result
 
     def do_POST(self):
         action = urlparse(self.path).path.removeprefix("/api/")

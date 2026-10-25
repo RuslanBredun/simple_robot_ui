@@ -17,19 +17,43 @@ the host service. The server listens on `127.0.0.1` only.
 recent logs through the QA commands and subscribes to ROS 2 topics in a
 background `rclpy` thread when the ROS distribution and robot overlay are
 available. Motor state topics include X/Y and optional camera axes.
-`/joint_states` supplies joint positions, `/weapon_state` supplies turret
-weapon mode and operation, `/connection_status` supplies the aggregate control
-connection, and `/gimbal_state` supplies the gimbal orchestrator mode and
-homing operation state. `/vehicle_mode` supplies the vehicle mode id. Missing
-packages/topics are reported as unavailable or stale; synthetic data is only
-used when `TURRET_WEB_MODE=mock` is explicitly set for development.
+`/joint_states` supplies joint positions and velocities, `/weapon_state`
+supplies weapon mode and operation, `/connection_status` supplies the connection
+to the operator application, and `/gimbal_state` supplies the gimbal
+orchestrator mode and homing operation state. Vehicle-mode data is not
+collected. Missing packages/topics are reported as unavailable or stale;
+synthetic data is only used when `TURRET_WEB_MODE=mock` is explicitly set for
+development. Motor current arrives in milliamps and is converted to amps;
+CANopen motor voltage and temperature are displayed in volts and degrees
+Celsius. `/telemetry/sensors_health` supplies configured sensor states.
+`/uart_telemetry` supplies main-battery voltage in centivolts and the runtime's
+voltage-derived charge estimate; the UI converts voltage to volts and labels
+the percentage as an estimate, not BMS SOC. A low-charge warning is shown at
+20% or below.
+
+CPU usage and memory usage are read from `/proc`; uptime is read from
+`/proc/uptime`, CPU temperature from a labelled CPU/SoC thermal sensor in
+`/sys`, and disk capacity from filesystem statistics. Unsupported metrics
+remain unavailable with an explanatory error rather than being replaced with
+synthetic data in real mode. The Info page gets OS identity from
+`/etc/os-release` and Python's platform information; the Web UI version comes
+from its frontend package metadata. Local IPv4 addresses are read from the
+device's interfaces without making network requests.
 
 The systemd launcher sources `/opt/ros/${ROS_DISTRO}` and
 `/opt/robot/ros` when present. The web service remains available if ROS 2 is
 not; only live ROS diagnostics are unavailable. The browser samples cached
-ROS state at 5 Hz and retains 60 seconds for charts. Service status and latest
-100 log lines refresh every 5 seconds. The downloadable JSON report includes
-product identifiers and recent logs, but no configuration files.
+ROS state and system health at 5 Hz and retains up to 15 minutes for charts.
+Charts provide a synchronized crosshair, pause, and time-window selection.
+Service status and latest 100 log lines refresh every 5 seconds. Logs support
+search, level filters, pause, and auto-scroll. System and diagnostic report
+controls, log download/copy, and CSV export are placeholders; there is no
+export endpoint or downloadable report.
+User-interface warnings use local thresholds of 80 °C CPU temperature and
+less than 10% free space on the root filesystem. These are operational UI
+thresholds, not manufacturer-specified limits. Position/velocity charts are
+hidden for S360 because the workspace does not confirm an equivalent data
+source and units for that model.
 
 **Important:** authentication is not implemented. The service binds only to
 loopback and must not be exposed to the device LAN or factory AP without an

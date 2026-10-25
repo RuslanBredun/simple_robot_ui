@@ -5,17 +5,27 @@ read-only four-page React UI with a Python standard-library backend.
 
 ## Scope
 
-- **Info** — the System tab combines device and software fields from the
-  installed `turret-info` utility; the Guide tab explains the Basic workflow.
-- **Diagnostics** — Service, Charts, and Logs tabs show service state and logs
+- **Info** — the System tab combines product fields from `turret-info` with
+  Web UI version, hostname, OS, CPU architecture, and local IPv4 addresses by
+  network interface; the Guide describes only verified system behavior and
+  marks missing product instructions.
+- **Diagnostics** — Overview, Charts, and Logs tabs show service state and logs
   from `turret-status` and `turret-logs`, ROS 2 motor/joint/orchestrator
-  telemetry, and 5 Hz charts with numeric value and time axes. The page also
-  provides a downloadable JSON report and confirmed Start/Stop/Restart actions
-  for the fixed `turret.service` unit.
+  telemetry, sensor health, and Linux CPU/RAM/CPU-temperature/disk/uptime
+  metrics. Charts sample at 5 Hz and support a synchronized crosshair, pause,
+  and a 30-second to 15-minute time window. Motor current is converted from
+  milliamps to amps; motor voltage and temperature are displayed in volts and
+  degrees Celsius. Joint velocities are displayed in degrees per second.
+  Battery charge is an explicitly labelled runtime estimate derived from
+  voltage, not BMS SOC; a low-charge warning is shown at 20% or below.
+  S360 position/velocity charts are hidden until their data source and units
+  are confirmed.
+  Confirmed Start/Stop/Restart actions are limited to the fixed `turret.service`
+  unit; report, copy, and export buttons remain placeholders.
 - **Settings** and **Control** — unavailable in Basic.
 
 The server listens on **127.0.0.1:8080 only**. Service actions are available
-only in the Service tab, require confirmation, and are allowlisted to
+only in the Overview tab, require confirmation, and are allowlisted to
 `turret.service`. They are disabled in Mock Mode. No Wi-Fi access point,
 network-facing access, or authentication is included. Do not expose it directly
 to untrusted networks.
@@ -42,8 +52,10 @@ The separate `turret-web.service` runs regardless of whether
 requires the ROS 2 environment and robot overlay; without them, the UI reports
 ROS telemetry as unavailable while the web service remains available.
 
-The diagnostic report includes product identifiers and recent service logs.
-Review it before sharing.
+System health metrics are read locally from Linux `/proc`, `/sys`, and
+filesystem statistics. CPU temperature is shown only when an explicitly
+identified CPU/SoC sensor is available. The confirmed main-battery voltage and
+runtime's voltage-derived charge estimate are shown separately from BMS SOC.
 
 ## Development
 

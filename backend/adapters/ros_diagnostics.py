@@ -30,6 +30,10 @@ class RosDiagnosticsAdapter:
             "connection": {"connected": None},
             "gimbal": None,
             "gimbal_error": None,
+            "battery": None,
+            "battery_error": None,
+            "sensors": None,
+            "sensors_error": None,
         }
         self._thread = None
         self._stop = threading.Event()
@@ -45,15 +49,19 @@ class RosDiagnosticsAdapter:
                     "/x_axis/state": {
                         "current": 1.2, "position": 1200, "rpm": 60,
                         "voltage": 24.1, "temperature": 38, "received_at": _now(),
+                        "drive_status": "READY", "operational": True,
+                        "motor_fault_alarm": False, "alarm_code": 0,
                     },
                     "/y_axis/state": {
                         "current": 0.8, "position": 850, "rpm": 22,
                         "voltage": 24.0, "temperature": 36, "received_at": _now(),
+                        "drive_status": "READY", "operational": True,
+                        "motor_fault_alarm": False, "alarm_code": 0,
                     },
                 },
                 "joints": {
-                    "turret_yaw_joint": {"position": 0.2, "received_at": _now()},
-                    "turret_pitch_joint": {"position": -0.1, "received_at": _now()},
+                    "turret_yaw_joint": {"position": 0.2, "velocity": 0.03, "received_at": _now()},
+                    "turret_pitch_joint": {"position": -0.1, "velocity": -0.02, "received_at": _now()},
                 },
                 "modes": {
                     "weapon": {"mode": "UNARMED", "received_at": _now()},
@@ -67,6 +75,22 @@ class RosDiagnosticsAdapter:
                     "received_at": _now(),
                 },
                 "gimbal_error": None,
+                "battery": {
+                    "voltage_v": 24.5,
+                    "charge_percent": 71.0,
+                    "is_live": True,
+                    "received_at": _now(),
+                },
+                "battery_error": None,
+                "sensors": {
+                    "aggregated_state": "HEALTHY",
+                    "items": [
+                        {"name": "Base IMU", "state": "HEALTHY"},
+                        {"name": "Inclinometer", "state": "HEALTHY"},
+                    ],
+                    "received_at": _now(),
+                },
+                "sensors_error": None,
             }
             return
         self._thread = threading.Thread(target=self._spin, name="ros-diagnostics", daemon=True)
@@ -85,7 +109,7 @@ class RosDiagnosticsAdapter:
             from rclpy.node import Node
             from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
             from sensor_msgs.msg import JointState
-            from std_msgs.msg import Bool, UInt16
+            from std_msgs.msg import Bool
             from rob_turret_msgs.msg import CANOpenMotorState, WeaponState
         except ImportError as exc:
             with self._lock:
@@ -99,6 +123,22 @@ class RosDiagnosticsAdapter:
         except ImportError as exc:
             gimbal_state_type = None
             gimbal_error = f"GimbalState message unavailable: {exc}"
+
+        try:
+            from rob_comm_msgs.msg import UARTTelemetry
+            uart_telemetry_type = UARTTelemetry
+            battery_error = None
+        except ImportError as exc:
+            uart_telemetry_type = None
+            battery_error = f"Battery telemetry unavailable: {exc}"
+
+        try:
+            from rob_telem_msgs.msg import SensorHealthReport
+            sensor_health_type = SensorHealthReport
+            sensors_error = None
+        except ImportError as exc:
+            sensor_health_type = None
+            sensors_error = f"Sensor health unavailable: {exc}"
 
         self._rclpy = rclpy
         try:
@@ -134,7 +174,17 @@ class RosDiagnosticsAdapter:
                 )
             with self._lock:
                 self._state["gimbal_error"] = gimbal_error
-            node.create_subscription(UInt16, "/vehicle_mode", self._vehicle_mode_callback, 10)
+                self._state["battery_error"] = battery_error
+                self._state["sensors_error"] = sensors_error
+            if uart_telemetry_type is not None:
+                node.create_subscription(
+                    uart_telemetry_type, "/uart_telemetry", self._battery_callback, 10
+                )
+            if sensor_health_type is not None:
+                node.create_subscription(
+                    sensor_health_type, "/telemetry/sensors_health",
+                    self._sensor_health_callback, 10
+                )
             with self._lock:
                 self._state.update({"available": True, "error": None})
             while rclpy.ok() and not self._stop.is_set():
@@ -153,22 +203,85 @@ class RosDiagnosticsAdapter:
     def _motor_callback(self, topic, message):
         telemetry = getattr(message, "telemetry", message)
         diagnostics = getattr(message, "diagnostics", None)
+        current_ma = getattr(telemetry, "current", None)
         item = {
             "position": getattr(telemetry, "position", None),
-            "current": getattr(telemetry, "current", None),
+            "current": round(current_ma / 1000.0, 3) if isinstance(current_ma, (int, float)) else None,
             "rpm": getattr(telemetry, "rpm", None),
             "voltage": getattr(telemetry, "voltage", None),
             "temperature": getattr(telemetry, "temperature", None),
             "received_at": _now(),
         }
         if diagnostics is not None:
+            drive_states = {
+                0: "IDLE",
+                1: "BOOTING",
+                2: "CONFIGURING",
+                3: "READY",
+                4: "FAULT",
+                5: "STOPPED",
+            }
+            state = getattr(diagnostics, "state", None)
+            motor_fault = getattr(diagnostics, "motor_fault_alarm", None)
+            operational = getattr(diagnostics, "operational", None)
+            if motor_fault or state == 4:
+                drive_status = "FAULT"
+            elif state == 3 and operational is True:
+                drive_status = "READY"
+            else:
+                drive_status = drive_states.get(state, "UNKNOWN")
+                if state == 3:
+                    drive_status = "UNKNOWN"
             item.update({
                 "alarm_code": getattr(diagnostics, "alarm_code", None),
                 "status_word": getattr(diagnostics, "status_word", None),
-                "state": getattr(diagnostics, "state", None),
+                "state": state,
+                "drive_status": drive_status,
+                "operational": operational,
+                "motor_fault_alarm": motor_fault,
+                "battery_power_down_alarm": getattr(
+                    diagnostics, "battery_power_down_alarm", None
+                ),
             })
         with self._lock:
             self._state["motors"][topic] = item
+
+    def _battery_callback(self, message):
+        voltage_raw = getattr(message, "battery_voltage", None)
+        with self._lock:
+            self._state["battery"] = {
+                "voltage_v": voltage_raw / 100.0
+                if isinstance(voltage_raw, (int, float)) else None,
+                "charge_percent": getattr(message, "battery_percent", None),
+                "is_live": bool(getattr(message, "is_live", False)),
+                "received_at": _now(),
+            }
+            self._state["battery_error"] = None
+
+    def _sensor_health_callback(self, message):
+        states = {
+            0: "UNKNOWN",
+            1: "PRESENT",
+            2: "HEALTHY",
+            3: "DEGRADED",
+            4: "FAILED",
+        }
+        with self._lock:
+            self._state["sensors"] = {
+                "aggregated_state": states.get(
+                    message.aggregated_state,
+                    f"UNKNOWN ({message.aggregated_state})",
+                ),
+                "items": [
+                    {
+                        "name": item.name,
+                        "state": states.get(item.state, f"UNKNOWN ({item.state})"),
+                    }
+                    for item in message.sensor_states
+                ],
+                "received_at": _now(),
+            }
+            self._state["sensors_error"] = None
 
     def _joint_callback(self, message):
         velocities = list(getattr(message, "velocity", []))
@@ -251,13 +364,6 @@ class RosDiagnosticsAdapter:
             }
             self._state["gimbal_error"] = None
 
-    def _vehicle_mode_callback(self, message):
-        with self._lock:
-            self._state["modes"]["vehicle"] = {
-                "mode": int(message.data),
-                "received_at": _now(),
-            }
-
     def snapshot(self):
         with self._lock:
             if self.mock:
@@ -269,12 +375,26 @@ class RosDiagnosticsAdapter:
                     item["received_at"] = received_at
                 for item in self._state["joints"].values():
                     item["position"] = round(max(-1.5, min(1.5, item["position"] + random.uniform(-0.025, 0.025))), 3)
+                    item["velocity"] = round(random.uniform(-0.12, 0.12), 3)
                     item["received_at"] = received_at
                 for item in self._state["modes"].values():
                     item["received_at"] = received_at
                 self._state["connection"]["received_at"] = received_at
                 if self._state["gimbal"] is not None:
                     self._state["gimbal"]["received_at"] = received_at
+                if self._state["battery"] is not None:
+                    self._state["battery"]["voltage_v"] = round(max(
+                        20, min(29, self._state["battery"]["voltage_v"] + random.uniform(-0.08, 0.08))
+                    ), 2)
+                    self._state["battery"]["charge_percent"] = round(max(
+                        0, min(100, self._state["battery"]["charge_percent"] + random.uniform(-0.5, 0.5))
+                    ), 1)
+                    self._state["battery"]["received_at"] = received_at
+                for item in self._state["motors"].values():
+                    item["voltage"] = round(max(18, min(30, item["voltage"] + random.uniform(-0.2, 0.2))), 2)
+                    item["temperature"] = round(max(20, min(90, item["temperature"] + random.uniform(-0.8, 0.8))), 1)
+                if self._state["sensors"] is not None:
+                    self._state["sensors"]["received_at"] = received_at
             result = {
                 **self._state,
                 "motors": {name: dict(item) for name, item in self._state["motors"].items()},
@@ -282,8 +402,15 @@ class RosDiagnosticsAdapter:
                 "modes": {name: dict(item) for name, item in self._state["modes"].items()},
                 "connection": dict(self._state["connection"]),
                 "gimbal": dict(self._state["gimbal"]) if self._state["gimbal"] else None,
+                "battery": dict(self._state["battery"]) if self._state["battery"] else None,
+                "sensors": {
+                    **self._state["sensors"],
+                    "items": [dict(item) for item in self._state["sensors"]["items"]],
+                } if self._state["sensors"] else None,
             }
             result["gimbal_error"] = self._state.get("gimbal_error")
+            result["battery_error"] = self._state.get("battery_error")
+            result["sensors_error"] = self._state.get("sensors_error")
         now = time.time()
         collections = [
             result["motors"],
@@ -293,6 +420,10 @@ class RosDiagnosticsAdapter:
         ]
         if result["gimbal"] is not None:
             collections.append({"gimbal": result["gimbal"]})
+        if result["battery"] is not None:
+            collections.append({"battery": result["battery"]})
+        if result["sensors"] is not None:
+            collections.append({"sensors": result["sensors"]})
         for collection in collections:
             for item in collection.values():
                 if not item.get("received_at"):
