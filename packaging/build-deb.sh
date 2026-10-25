@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="${VERSION:-0.2.0}"
+VERSION="${VERSION:-0.4.0}"
 test -f "$ROOT/frontend/dist/index.html" || { echo "Build frontend first: npm run build" >&2; exit 1; }
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/DEBIAN" "$STAGE/opt/turret-web/static" "$STAGE/lib/systemd/system" "$STAGE/etc/sudoers.d" "$ROOT/dist"
 cp "$ROOT/backend/server.py" "$STAGE/opt/turret-web/server.py"
+mkdir -p "$STAGE/opt/turret-web/adapters"
+cp "$ROOT"/backend/adapters/*.py "$STAGE/opt/turret-web/adapters/"
+cp "$ROOT/packaging/start.sh" "$STAGE/opt/turret-web/start.sh"
+chmod 0755 "$STAGE/opt/turret-web/start.sh"
 cp -a "$ROOT/frontend/dist/." "$STAGE/opt/turret-web/static/"
 cp "$ROOT/packaging/turret-web.service" "$STAGE/lib/systemd/system/"
 cp "$ROOT/packaging/turret-web.sudoers" "$STAGE/etc/sudoers.d/turret-web"

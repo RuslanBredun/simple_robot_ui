@@ -21,13 +21,13 @@ jobs:
       - name: Frontend install and build
         run: |
           cd frontend
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npm run build
       - name: Package DEB
         run: |
           bash packaging/build-deb.sh
           dpkg-deb --info dist/*.deb
-          dpkg-deb --contents dist/*.deb | grep -E 'server.py|index.html|turret-web.service'
+          dpkg-deb --contents dist/*.deb | grep -E 'server.py|adapters/|start.sh|index.html|turret-web.service|sudoers.d/turret-web'
       - name: Upload offline DEB
         uses: actions/upload-artifact@v4
         with:

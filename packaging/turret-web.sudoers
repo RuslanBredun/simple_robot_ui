@@ -1,2 +1,2 @@
-# Only two service actions may be executed as root.
-turret-web ALL=(root) NOPASSWD: /usr/bin/systemctl stop turret.service, /usr/bin/systemctl restart turret.service
+# The web service may only start, stop, or restart the fixed robot runtime unit.
+turret-web ALL=(root) NOPASSWD: /usr/bin/systemctl start turret.service, /usr/bin/systemctl stop turret.service, /usr/bin/systemctl restart turret.service

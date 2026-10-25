@@ -2,38 +2,54 @@
 
 ## Target prerequisites
 
-Ubuntu with `systemd`, `python3`, `sudo`, `adduser`, and existing `turret.service`. Dependencies declared in DEB are OS prerequisites, not embedded, so verify before going offline:
+Ubuntu with `systemd`, `python3`, and `adduser`; the robot runtime package
+should provide the QA utilities and ROS 2 overlay:
 
 ```bash
-dpkg-query -W python3 systemd sudo adduser
+dpkg-query -W python3 systemd adduser
+command -v turret-info turret-status turret-logs
 systemctl status turret.service
 ```
 
 ## Install
 
-Download the `turret-web-deb` artifact from GitHub Actions and unzip it:
+Download the `turret-web-deb` artifact from GitHub Actions:
 
 ```bash
-sudo apt install ./turret-web_0.2.0_all.deb
+sudo apt install ./turret-web_0.4.0_all.deb
 sudo systemctl status turret-web.service
 journalctl -u turret-web.service -n 50 --no-pager
 curl http://127.0.0.1:8080/api/status
 ```
 
-Access on the Pi with browser at `http://127.0.0.1:8080` or from workstation with an SSH tunnel:
+Access on the Pi with a browser at `http://127.0.0.1:8080` or from a
+workstation with an SSH tunnel:
 
 ```bash
 ssh -L 8080:127.0.0.1:8080 ubuntu@PI_IP
 ```
 
-Open `http://127.0.0.1:8080` locally. Buttons act on `turret.service`. Logs show latest 200 lines, refreshed every 2.5 seconds.
+The UI reads the latest 100 logs; status and logs refresh every 5 seconds.
+ROS telemetry is sampled at 5 Hz. For live ROS data, `ROS_DISTRO` must be set
+in `/usr/share/robot/environment/full.env`, and the robot overlay must exist
+at `/opt/robot/ros`. If ROS is unavailable, the web service still starts and
+reports that telemetry is unavailable.
+
+The Service tab provides confirmed Start, Stop, and Restart actions for
+`turret.service`. Mock Mode disables all service actions.
 
 ## Troubleshooting
 
 - Missing JS/CSS: confirm `/opt/turret-web/static/assets` exists.
-- Stop/Restart failure: run `sudo visudo -cf /etc/sudoers.d/turret-web` and inspect `journalctl -u turret-web.service`.
-- Empty logs: confirm `turret-web` account is in `systemd-journal` group and restart web service after group update.
-- Python `NoNewPrivileges` must not be enabled while stop/restart use sudo. For production replace with a narrower privileged host-side RPC helper.
-- Service status not active: confirm unit is exactly `turret.service`.
+- Missing product information or logs: confirm the runtime package is installed
+  and the three `turret-*` commands are available in the service user's `PATH`.
+- ROS data unavailable: inspect `journalctl -u turret-web.service`, verify ROS
+  2 and `/opt/robot/ros` are installed, then check whether this model publishes
+  the configured topics. `/joint_states` may not be published by every model.
+- Empty logs: confirm `turret-web` is a member of `systemd-journal` and restart
+  `turret-web.service` after a group membership change.
+- Service action rejected: confirm `/etc/sudoers.d/turret-web` grants only
+  the fixed Start/Stop/Restart commands for `turret.service` and inspect
+  `journalctl -u turret-web.service`.
 
 No factory AP setup, login, or TLS yet.
