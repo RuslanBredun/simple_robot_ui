@@ -99,4 +99,16 @@ No factory AP setup, login, or TLS yet.
 
 ## Control prototype
 
-The Control page is a layout-only v0.5 preview. Camera and tool selections and Motion Enable/Slow Mode switches change local UI state only. There is no RTSP playback, joystick publishing, homing, tool activation, or device-side command handling. It can be reviewed offline without any new target dependencies. Settings remains unavailable.
+The Control page is a mock-only v0.5 preview. Camera/profile and tool/mode
+selections, joystick axes, and Motion Enable/Slow Mode switches change local
+UI state only. Device status is explicitly unavailable. There is no RTSP
+playback, ROS command publisher, homing service call, tool activation, or
+device-side control handling; no additional target dependency is required.
+Settings remains unavailable.
+
+The ROS workspace currently has no `WEB_UI` source registration or shared
+control-owner lease exposed to this package. `/connection_status` is an
+aggregated status and must not be overwritten to register the Web UI. Do not
+connect the preview directly to shared actuation topics. A future integration
+requires the shared Communication Layer / core application API and a
+browser-compatible video gateway with a verified model-specific stream map.

@@ -77,10 +77,39 @@ Future milestones: firmware inventory, richer ROS diagnostics, safe
 configuration editing, Extended operator control, and Factory/Field AP access
 policy.
 
-## v0.5 Control layout prototype
+## v0.5 Control mock preview and integration boundary
 
-`frontend/src/pages/ControlPage.jsx` is a single-page tester UI using the same visual language as Info/Diagnostics. Video stays visible alongside motion and tool status. Camera 1/2 and High/Medium/Low are local selections only; browsers cannot consume RTSP natively. A video gateway and verified stream configuration are pending.
+`frontend/src/pages/ControlPage.jsx` composes separate camera, joystick, motion,
+tool, and status-preview components. Camera/profile and tool/mode selections,
+joystick axes in `[-1, 1]`, and Motion Enable/Slow Mode switches are local UI
+state only. Slow Mode does not scale joystick values. Homing is disabled.
+Device status is shown as unavailable; preview state is never presented as
+hardware telemetry. The page has no ROS command publisher, control API, RTSP
+playback, or tool activation path.
 
-The joystick is deliberately inactive; Motion Enable and Slow Mode are local-only visual states, not commands. Slow Mode must eventually be represented as a separate flag, without reducing the joystick's normalized full range. Homing is disabled. Tool IDs 1/2/3/5 and tool modes 1/2/3 are selectable locally; safety and activation are read-only, and no actuation interface is exposed.
+Source inspection in `/home/ubuntu/ros2_ws` confirmed ROS command and telemetry
+contracts exist, but this web package does not integrate with them. The
+existing `/connection_status` is an aggregated `std_msgs/Bool` from the
+AntiBug and Hmarka connection paths; `/antibug/control_active` is a separate
+AntiBug control-activity signal. The ROS workspace does not expose a
+`WEB_UI` connection registration, heartbeat, or explicit shared control-owner
+lease that this web service can safely use. The existing priority manager's
+UDP source tracking is not a web-facing ownership API. Do not treat browser
+activity, backend-to-ROS availability, source connection, and control
+ownership as equivalent states.
 
-Integration note for the next agent: the user identified three candidate ROS 2 topic families — `turret control`, `turret fire`, `turret move`. These are **unverified names/contracts**, not implemented publishers. Before any connection, inspect actual message definitions, topic names, ownership, permission and interlock behavior, then ask the user about unresolved fields. Never infer command payloads or report a UI toggle as actual device state. For this prototype, no backend or ROS 2 command endpoints are added.
+The workspace contains RTSP camera URLs for a particular Hmarka K2
+configuration, but no browser-compatible video gateway. The configuration
+does not define the requested High/Medium/Low labels. Therefore camera
+selection in this preview does not select or start a stream. The K2 example
+does not provide a per-tool runtime status contract usable by this page.
+
+Future integration must use the planned shared Communication Layer / core
+application API to register `WEB_UI` independently, report browser/backend
+liveness with timeout, and expose ownership separately from connection.
+Control ownership must be explicit and exclusive, must not be acquired on
+page load, and must reject requests while another operator owns control. Do
+not add direct web-service publishers to shared actuation topics or add a
+parallel connection manager. Any future video work requires a browser gateway
+and a verified model-specific stream/profile map. Fire/safety activation stays
+outside this service UI.

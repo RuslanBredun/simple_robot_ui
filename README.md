@@ -31,7 +31,7 @@ read-only four-page React UI with a Python standard-library backend.
   continue to update; measured values appear beside the nearest points.
   Confirmed Start/Stop/Restart actions are limited to the fixed `turret.service`
   unit; report, copy, and export buttons remain placeholders.
-- **Control** — v0.5 layout preview: single camera panel, camera/quality selectors, inactive joystick, local Motion Enable/Slow Mode toggles, disabled Homing, tool IDs 1/2/3/5 and modes 1/2/3. No video or device command integration yet. Tool safety/activation are status-only.
+- **Control** — v0.5 mock-only preview: camera/profile selectors, a local normalized joystick display, Motion Enable/Slow Mode preview toggles, disabled Homing, and local tool/mode selectors. Device status is explicitly unavailable; no ROS commands, control-source registration, tool activation, or live video are connected.
 - **Settings** — unavailable.
 
 The server listens on **127.0.0.1:8080 only**. Service actions are available
