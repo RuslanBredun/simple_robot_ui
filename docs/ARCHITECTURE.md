@@ -13,8 +13,12 @@ action APIs require a loopback Host and an allowlisted same-origin request;
 sudoers grants only the three fixed systemctl actions. Mock mode cannot control
 the host service. The server listens on `127.0.0.1` only.
 
-`turret-info` supplies the Info fields. Diagnostics reads service status and
-recent logs through the QA commands and subscribes to ROS 2 topics in a
+`turret-info` supplies product and software version fields. The Info page
+shows only product identifiers and the requested application/firmware versions;
+the DEB builder records its Web UI build date in `build-info.json`.
+
+Diagnostics reads service status and recent logs through the QA commands and
+subscribes to ROS 2 topics in a
 background `rclpy` thread when the ROS distribution and robot overlay are
 available. Motor state topics include X/Y and optional camera axes.
 `/joint_states` supplies joint positions and velocities, `/weapon_state`
@@ -28,17 +32,14 @@ CANopen motor voltage and temperature are displayed in volts and degrees
 Celsius. `/telemetry/sensors_health` supplies configured sensor states.
 `/uart_telemetry` supplies main-battery voltage in centivolts and the runtime's
 voltage-derived charge estimate; the UI converts voltage to volts and labels
-the percentage as an estimate, not BMS SOC. A low-charge warning is shown at
-20% or below.
+the percentage as an estimate, not BMS SOC.
 
 CPU usage and memory usage are read from `/proc`; uptime is read from
 `/proc/uptime`, CPU temperature from a labelled CPU/SoC thermal sensor in
-`/sys`, and disk capacity from filesystem statistics. Unsupported metrics
-remain unavailable with an explanatory error rather than being replaced with
-synthetic data in real mode. The Info page gets OS identity from
-`/etc/os-release` and Python's platform information; the Web UI version comes
-from its frontend package metadata. Local IPv4 addresses are read from the
-device's interfaces without making network requests.
+`/sys`, and disk capacity from filesystem statistics. These values are
+available to the Charts view, while the Info page omits host and network
+details. The Web UI version comes from frontend package metadata and its DEB
+build date is stored in packaged `build-info.json`.
 
 The systemd launcher sources `/opt/ros/${ROS_DISTRO}` and
 `/opt/robot/ros` when present. The web service remains available if ROS 2 is
@@ -47,8 +48,13 @@ ROS state and system health at 5 Hz and retains up to 15 minutes for charts.
 Charts provide a synchronized crosshair, pause, and time-window selection.
 Hovering keeps the crosshair at the same relative chart position while the
 live time window and samples continue to advance. Each series' nearest sample
-value is displayed next to its point. The Overview groups tower, axis/drive,
-sensor, and computer/power status together instead of separate subtabs.
+value is displayed next to its point. The Overview shows main application
+activity and operator connection separately, followed by four turret/weapon
+mode and operation cards, axes/drives, and sensors. Computer and battery
+metrics remain in Charts rather than the Overview. The Info Guide has separate
+sections for product overview, Antibag, first startup, package contents, Web UI,
+and additional integrations; operational procedures are deferred to approved
+product documentation.
 Service status and logs refresh every 5 seconds. Logs support search, level
 filters, pause, and auto-scroll; they can show records since the main
 `turret.service` activation or use fixed 15-minute, 1-hour, 6-hour, and

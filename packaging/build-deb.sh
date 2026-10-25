@@ -2,11 +2,13 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="${VERSION:-0.4.0}"
+BUILD_DATE="$(date -u +%F)"
 test -f "$ROOT/frontend/dist/index.html" || { echo "Build frontend first: npm run build" >&2; exit 1; }
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/DEBIAN" "$STAGE/opt/turret-web/static" "$STAGE/lib/systemd/system" "$STAGE/etc/sudoers.d" "$STAGE/usr/bin" "$ROOT/dist"
 cp "$ROOT/backend/server.py" "$STAGE/opt/turret-web/server.py"
+printf '{"build_date":"%s"}\n' "$BUILD_DATE" > "$STAGE/opt/turret-web/build-info.json"
 mkdir -p "$STAGE/opt/turret-web/adapters"
 cp "$ROOT"/backend/adapters/*.py "$STAGE/opt/turret-web/adapters/"
 cp "$ROOT/packaging/start.sh" "$STAGE/opt/turret-web/start.sh"

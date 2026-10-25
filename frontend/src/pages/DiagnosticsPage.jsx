@@ -23,8 +23,8 @@ const logRanges = [
   { value: '24h', label: '24 години' },
 ];
 
-function TabStrip({ items, selected, onSelect, label }) {
-  return <div className="tab-strip" role="tablist" aria-label={label}>
+function TabStrip({ items, selected, onSelect, label, className = '' }) {
+  return <div className={`tab-strip ${className}`} role="tablist" aria-label={label}>
     {items.map(({ id, label: tabLabel }) =>
       <button
         key={id}
@@ -100,35 +100,6 @@ function StatusCard({ label, value, fresh, detail }) {
   </div>;
 }
 
-function MetricCard({ label, value, detail, error }) {
-  return <div className="status-card">
-    <label>{label}</label>
-    <strong>{value ?? 'Недоступно'}</strong>
-    {detail && <span className="metric-detail">{detail}</span>}
-    {error && <span className="metric-error">{error}</span>}
-  </div>;
-}
-
-function formatBytes(bytes) {
-  if (!Number.isFinite(bytes)) return null;
-  const units = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
-}
-
-function formatUptime(seconds) {
-  if (!Number.isFinite(seconds)) return null;
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  return days ? `${days} д ${hours} год` : `${hours} год ${minutes} хв`;
-}
-
 function sensorLabel(name, index) {
   const normalized = name.toLowerCase();
   if (normalized.includes('imu')) return normalized.includes('base') ? 'IMU основи' : 'IMU';
@@ -144,7 +115,6 @@ export function DiagnosticsPage() {
   const [tab, setTab] = useState('service');
   const [chartTab, setChartTab] = useState('axes');
   const [diagnostics, setDiagnostics] = useState(null);
-  const [system, setSystem] = useState(null);
   const [samples, setSamples] = useState({});
   const [status, setStatus] = useState('');
   const [logs, setLogs] = useState('');
@@ -192,7 +162,6 @@ export function DiagnosticsPage() {
         const data = await api('diagnostics');
         if (!stopped) {
           setDiagnostics(data.ros);
-          setSystem(data.system);
           setErrors((previous) => ({ ...previous, ros: '' }));
           setSamples((previous) => {
             let next = previous;
@@ -339,18 +308,6 @@ export function DiagnosticsPage() {
   const batteryPercent = diagnostics?.battery?.charge_percent;
   const batteryPercentAvailable = isFresh(diagnostics?.battery) &&
     diagnostics.battery.is_live && isPercent(batteryPercent);
-  const batteryIssue = batteryPercentAvailable && batteryPercent <= 20;
-  const systemIssues = [];
-  if (Number.isFinite(system?.cpu_temperature_c) && system.cpu_temperature_c >= 80) {
-    systemIssues.push('Температура CPU досягла 80 °C');
-  }
-  const diskFreePercent = Number.isFinite(system?.disk_total_bytes) &&
-    system.disk_total_bytes > 0 && Number.isFinite(system?.disk_free_bytes)
-    ? system.disk_free_bytes / system.disk_total_bytes * 100
-    : null;
-  if (diskFreePercent !== null && diskFreePercent < 10) {
-    systemIssues.push('Вільно менше 10 % місця на системному диску');
-  }
   const powerIssues = Object.entries(diagnostics?.motors || {})
     .filter(([, item]) => isFresh(item) && item.battery_power_down_alarm);
   const sensorIssues = isFresh(diagnostics?.sensors)
@@ -372,8 +329,14 @@ export function DiagnosticsPage() {
     group.joint = item;
     motorAxisGroups.set(key, group);
   }
-  const overviewIssueCount = motorIssues.length + powerIssues.length +
-    sensorIssues.length + Number(batteryIssue) + systemIssues.length;
+  const overviewIssueCount = motorIssues.length + powerIssues.length + sensorIssues.length;
+  const activeStatus = status.match(/^\s*ACTIVE\s*:\s*(\S+)/im)?.[1]?.toLowerCase();
+  const hasKnownAppStatus = ['active', 'inactive', 'failed'].includes(activeStatus);
+  const appStatusLabel = activeStatus === 'active'
+    ? 'Активний'
+    : activeStatus === 'inactive' || activeStatus === 'failed'
+      ? 'Неактивний'
+      : 'Немає даних';
   const visibleLogs = logs.split('\n').filter((line) => {
     const query = logSearch.trim().toLowerCase();
     if (query && !line.toLowerCase().includes(query)) return false;
@@ -389,11 +352,22 @@ export function DiagnosticsPage() {
   };
 
   return <section className="panel diagnostics-panel">
-    <div className="line diagnostics-heading">
+    <div className="line panel-heading diagnostics-heading">
       <div><div className="tag">СТАН СИСТЕМИ</div><h2>Діагностика</h2></div>
-      <button className="download" type="button" disabled title="Функція ще не реалізована">
-        Звіт — незабаром
-      </button>
+      <div className="diagnostics-actions">
+        <button className="danger" disabled={Boolean(busy) || mockMode} onClick={() => serviceAction('stop')}>
+          {busy === 'stop' ? 'Зупинка…' : 'Stop'}
+        </button>
+        <button className="primary" disabled={Boolean(busy) || mockMode} onClick={() => serviceAction('start')}>
+          {busy === 'start' ? 'Запуск…' : 'Start'}
+        </button>
+        <button className="primary" disabled={Boolean(busy) || mockMode} onClick={() => serviceAction('restart')}>
+          {busy === 'restart' ? 'Перезапуск…' : 'Restart'}
+        </button>
+        <button className="download" type="button" disabled title="Функція ще не реалізована">
+          Звіт
+        </button>
+      </div>
     </div>
     <div className="tab-strip" role="tablist" aria-label="Вкладки діагностики">
       {tabs.map(({ id, label }) =>
@@ -409,73 +383,59 @@ export function DiagnosticsPage() {
 
     {tab === 'service' && <>
       <section className="overview-group">
-        <div className="line service-title">
-          <div><div className="tag">ROBOT RUNTIME</div><h3>turret.service</h3></div>
-          <div className="service-actions">
-            <button className="danger" disabled={Boolean(busy) || mockMode} onClick={() => serviceAction('stop')}>
-              {busy === 'stop' ? 'Зупинка…' : 'Stop'}
-            </button>
-            <button className="primary" disabled={Boolean(busy) || mockMode} onClick={() => serviceAction('start')}>
-              {busy === 'start' ? 'Запуск…' : 'Start'}
-            </button>
-            <button className="primary" disabled={Boolean(busy) || mockMode} onClick={() => serviceAction('restart')}>
-              {busy === 'restart' ? 'Перезапуск…' : 'Restart'}
-            </button>
-          </div>
+        <h3>Стан підключення</h3>
+        <div className="status-grid">
+          <StatusCard label="Основний додаток" value={appStatusLabel} fresh={hasKnownAppStatus} />
+          <StatusCard
+            label="Підключення оператора"
+            value={isFresh(diagnostics?.connection)
+              ? diagnostics.connection.connected ? 'Підключено' : 'Відключено'
+              : 'Немає даних'}
+            fresh={isFresh(diagnostics?.connection)}
+          />
         </div>
-        <p className="muted">Команди керують лише `turret.service`; кожна потребує підтвердження.</p>
-        {mockMode && <p className="muted">У режимі розробки керування реальним сервісом вимкнено.</p>}
         {actionMessage && <p className="success" role="status">{actionMessage}</p>}
         {errors.action && <p className="error" role="alert">{errors.action}</p>}
         {errors.status && <p className="error" role="alert">{errors.status}</p>}
-        <pre className="status-output">{status || 'Завантаження стану сервісу…'}</pre>
       </section>
 
-      <div className="line telemetry-title">
-        <div><div className="tag">ROS 2</div><h3>Поточний стан</h3></div>
-        <span className="muted">Оновлення: 5 Гц</span>
-      </div>
+      <section className="overview-group">
+        <h3>Поточний стан</h3>
+        <div className="status-grid">
+          <StatusCard
+            label="Режим турелі"
+            value={isFresh(diagnostics?.gimbal) ? stateLabel(diagnostics.gimbal.mode) : 'Немає даних'}
+            fresh={isFresh(diagnostics?.gimbal)}
+          />
+          <StatusCard
+            label="Операція турелі"
+            value={isFresh(diagnostics?.gimbal)
+              ? `${stateLabel(diagnostics.gimbal.operation_type)} · ${stateLabel(diagnostics.gimbal.operation_state)}`
+              : 'Немає даних'}
+            fresh={isFresh(diagnostics?.gimbal)}
+          />
+          <StatusCard
+            label="Режим зброї"
+            value={isFresh(diagnostics?.modes?.weapon)
+              ? stateLabel(diagnostics.modes.weapon.mode)
+              : 'Немає даних'}
+            fresh={isFresh(diagnostics?.modes?.weapon)}
+          />
+          <StatusCard
+            label="Операція зброї"
+            value={isFresh(diagnostics?.modes?.weapon)
+              ? `${stateLabel(diagnostics.modes.weapon.operation_type)} · ${stateLabel(diagnostics.modes.weapon.operation_state)}`
+              : 'Немає даних'}
+            fresh={isFresh(diagnostics?.modes?.weapon)}
+          />
+        </div>
+        {diagnostics?.gimbal_error && <p className="muted">{diagnostics.gimbal_error}</p>}
+      </section>
       {errors.ros && <p className="error" role="alert">{errors.ros}</p>}
       {!diagnostics?.available && !errors.ros &&
         <p className="muted">{diagnostics?.error || 'Очікування ROS 2…'}</p>}
 
       {diagnostics && <>
-        <section className="overview-group">
-          <h3>Башта</h3>
-          <div className="status-grid">
-            <StatusCard
-              label="Підключення операторського застосунку"
-              value={isFresh(diagnostics.connection)
-                ? diagnostics.connection.connected ? 'Підключено' : 'Відключено'
-                : 'Немає даних'}
-              fresh={isFresh(diagnostics.connection)}
-            />
-            <StatusCard
-              label="Режим башти"
-              value={isFresh(diagnostics.gimbal) ? stateLabel(diagnostics.gimbal.mode) : 'Немає даних'}
-              fresh={isFresh(diagnostics.gimbal)}
-            />
-            <StatusCard
-              label="Операція башти"
-              value={isFresh(diagnostics.gimbal)
-                ? `${stateLabel(diagnostics.gimbal.operation_type)} · ${stateLabel(diagnostics.gimbal.operation_state)}`
-                : 'Немає даних'}
-              fresh={isFresh(diagnostics.gimbal)}
-            />
-            {diagnostics.modes?.weapon && <StatusCard
-              label="Зброя"
-              value={isFresh(diagnostics.modes.weapon)
-                ? `${stateLabel(diagnostics.modes.weapon.mode)}${diagnostics.modes.weapon.operation_type &&
-                  diagnostics.modes.weapon.operation_type !== 'NONE'
-                  ? ` · ${stateLabel(diagnostics.modes.weapon.operation_type)}: ${stateLabel(diagnostics.modes.weapon.operation_state)}`
-                  : ''}`
-                : 'Застарілі дані'}
-              fresh={isFresh(diagnostics.modes.weapon)}
-            />}
-          </div>
-          {diagnostics.gimbal_error && <p className="muted">{diagnostics.gimbal_error}</p>}
-        </section>
-
         <section className="overview-group">
           <h3>Приводи та осі</h3>
           <div className="status-grid">
@@ -526,51 +486,10 @@ export function DiagnosticsPage() {
             <p className="muted">{diagnostics.sensors_error}</p>}
         </section>
 
-        <section className="overview-group">
-          <h3>Комп’ютер і живлення</h3>
-          {system && <div className="status-grid">
-            <MetricCard label="Завантаження CPU" value={Number.isFinite(system.cpu_percent) ? `${system.cpu_percent.toFixed(1)} %` : null} error={system.errors?.cpu_percent} />
-            <MetricCard
-              label="Оперативна пам’ять"
-              value={Number.isFinite(system.memory_percent) ? `${system.memory_percent.toFixed(1)} %` : null}
-              detail={system.memory_used_bytes != null && system.memory_total_bytes != null
-                ? `${formatBytes(system.memory_used_bytes)} з ${formatBytes(system.memory_total_bytes)}`
-                : null}
-              error={system.errors?.memory}
-            />
-            <MetricCard label="Температура CPU" value={Number.isFinite(system.cpu_temperature_c) ? `${system.cpu_temperature_c.toFixed(1)} °C` : null} error={system.errors?.cpu_temperature_c} />
-            <MetricCard
-              label="Вільне місце"
-              value={system.disk_free_bytes != null ? formatBytes(system.disk_free_bytes) : null}
-              detail={[
-                system.disk_percent != null ? `Використано ${system.disk_percent.toFixed(1)} %` : null,
-                system.filesystem_read_only === true ? 'Файлова система лише для читання' : null,
-              ].filter(Boolean).join(' · ') || null}
-              error={system.errors?.disk}
-            />
-            <MetricCard label="Час роботи пристрою" value={formatUptime(system.uptime_seconds)} error={system.errors?.uptime} />
-          </div>}
-          {diagnostics.battery ? <div className="status-grid overview-battery">
-            <StatusCard
-              label="Основна батарея"
-              value={isFresh(diagnostics.battery) && Number.isFinite(diagnostics.battery.voltage_v)
-                ? `${diagnostics.battery.voltage_v.toFixed(2)} В${batteryPercentAvailable
-                  ? ` · ≈${batteryPercent.toFixed(1)} %`
-                  : ''}`
-                : 'Немає актуальних даних'}
-              detail="Заряд є оцінкою runtime за напругою, не BMS SOC; попередження при ≤20 %."
-              fresh={isFresh(diagnostics.battery) && Number.isFinite(diagnostics.battery.voltage_v)}
-            />
-          </div> : <p className="muted">{diagnostics.battery_error || 'Очікування телеметрії батареї.'}</p>}
-          {diagnostics.battery_error && diagnostics.battery &&
-            <p className="muted">{diagnostics.battery_error}</p>}
-        </section>
       </>}
 
       {overviewIssueCount > 0 && <section className="issues" role="alert">
         <h3>Активні попередження та помилки</h3>
-        {batteryIssue && <p>Основна батарея: орієнтовний заряд не перевищує 20 %.</p>}
-        {systemIssues.map((issue) => <p key={issue}>{issue}</p>)}
         {motorIssues.map(([name, item]) =>
           <p key={name}>{axisLabel(name)}: помилка приводу{item.alarm_code ? ` (код ${item.alarm_code})` : ''}</p>
         )}
@@ -581,23 +500,15 @@ export function DiagnosticsPage() {
           <p key={`${item.name}:${index}`}>{sensorLabel(item.name, index)}: {stateLabel(item.state)}</p>
         )}
       </section>}
-      {overviewIssueCount === 0 && diagnostics?.available &&
-        <p className="muted">Активних попереджень та помилок немає.</p>}
     </>}
 
     {tab === 'charts' && <>
-      <div className="chart-intro">
-        <div className="tag">ТЕЛЕМЕТРІЯ · ОСТАННІ {timeRange < 60 ? `${timeRange} СЕКУНД` : `${timeRange / 60} ХВ`}</div>
-        <p className="muted">Дані оновлюються з частотою 5 Гц. Показано лише доступні вимірювання.</p>
-        <div className="chart-controls">
-          <label>Період
-            <select value={timeRange} onChange={(event) => setTimeRange(Number(event.target.value))}>
-              <option value={30}>30 секунд</option>
-              <option value={60}>1 хвилина</option>
-              <option value={300}>5 хвилин</option>
-              <option value={900}>15 хвилин</option>
-            </select>
-          </label>
+      <div className="diagnostics-subheader">
+        <div className="diagnostics-subheader-title">
+          <div className="tag">ТЕЛЕМЕТРІЯ</div>
+          <h3>Останні {timeRange < 60 ? `${timeRange} секунд` : `${timeRange / 60} хв`}</h3>
+        </div>
+        <div className="actions diagnostics-subheader-actions">
           <button className="primary" onClick={() => {
             if (chartsPaused) {
               setChartsPaused(false);
@@ -606,15 +517,26 @@ export function DiagnosticsPage() {
               setPausedAt(Date.now());
               setChartsPaused(true);
             }
-          }}>{chartsPaused ? 'Продовжити' : 'Пауза графіків'}</button>
-          <button type="button" disabled title="Функція ще не реалізована">CSV — незабаром</button>
+          }}>{chartsPaused ? 'Продовжити' : 'Пауза'}</button>
+          <button type="button" disabled title="Функція ще не реалізована">CSV</button>
         </div>
+      </div>
+      <div className="diagnostics-controls chart-controls">
+        <label>Період
+          <select value={timeRange} onChange={(event) => setTimeRange(Number(event.target.value))}>
+            <option value={30}>30 секунд</option>
+            <option value={60}>1 хвилина</option>
+            <option value={300}>5 хвилин</option>
+            <option value={900}>15 хвилин</option>
+          </select>
+        </label>
       </div>
       <TabStrip
         items={chartTabs}
         selected={chartTab}
         onSelect={setChartTab}
         label="Групи графіків"
+        className="chart-tabs"
       />
       {errors.ros && <p className="error" role="alert">{errors.ros}</p>}
       {errors.model && <p className="error" role="alert">Не вдалося визначити модель пристрою: {errors.model}</p>}
@@ -655,18 +577,20 @@ export function DiagnosticsPage() {
     </>}
 
     {tab === 'logs' && <>
-      <div className="line">
-        <div><div className="tag">ЖУРНАЛ СЕРВІСУ</div><h3>Останні записи</h3></div>
-        <div className="actions">
+      <div className="diagnostics-subheader">
+        <div className="diagnostics-subheader-title">
+          <div className="tag">ЖУРНАЛ СЕРВІСУ</div>
+          <h3>Останні записи</h3>
+        </div>
+        <div className="actions diagnostics-subheader-actions log-actions">
           <button onClick={refreshLogs}>Оновити</button>
-          <button onClick={() => setLogsPaused((value) => !value)}>{logsPaused ? 'Продовжити оновлення' : 'Пауза оновлення'}</button>
-          <button onClick={() => setAutoScroll((value) => !value)}>{autoScroll ? 'Вимкнути автопрокрутку' : 'Увімкнути автопрокрутку'}</button>
-          <button type="button" disabled title="Функція ще не реалізована">Копіювати — незабаром</button>
-          <button type="button" disabled title="Функція ще не реалізована">Завантажити — незабаром</button>
+          <button onClick={() => setLogsPaused((value) => !value)}>{logsPaused ? 'Продовжити' : 'Пауза'}</button>
+          <button onClick={() => setAutoScroll((value) => !value)}>{autoScroll ? 'Автоскрол: так' : 'Автоскрол: ні'}</button>
+          <button type="button" disabled title="Функція ще не реалізована">Копіювати</button>
+          <button type="button" disabled title="Функція ще не реалізована">Завантажити</button>
         </div>
       </div>
-      <p className="muted">Журнал основного застосунку · оновлення кожні 5 секунд</p>
-      <div className="log-filters">
+      <div className="diagnostics-controls log-filters">
         <label>Проміжок часу
           <select value={logRange} onChange={(event) => setLogRange(event.target.value)}>
             {logRanges.map(({ value, label }) =>

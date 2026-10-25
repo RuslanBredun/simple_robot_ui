@@ -1,5 +1,6 @@
 import json
 import sys
+import tempfile
 import threading
 import unittest
 from pathlib import Path
@@ -241,6 +242,19 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual(diagnostics["ros"]["gimbal"]["mode"], "MANUAL")
         self.assertIn("cpu_percent", diagnostics["system"])
         self.assertEqual(info["host"]["os_name"], "Ubuntu (mock)")
+        self.assertIsNone(info["web_ui"]["build_date"])
+
+    def test_web_ui_build_date_is_loaded_from_packaged_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "build-info.json").write_text(
+                '{"build_date":"2026-10-25"}', encoding="utf-8"
+            )
+            with patch.object(server, "__file__", str(root / "server.py")):
+                self.assertEqual(
+                    server.web_ui_build_info(),
+                    {"build_date": "2026-10-25"},
+                )
 
     def test_logs_endpoint_accepts_allowlisted_time_range(self):
         with patch.object(server.Handler.qa, "logs", wraps=server.Handler.qa.logs) as logs:

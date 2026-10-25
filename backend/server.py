@@ -21,6 +21,19 @@ if not os.environ.get("TURRET_WEB_STATIC") and not STATIC.is_dir():
 MOCK_MODE = os.environ.get("TURRET_WEB_MODE", "real").lower() == "mock"
 
 
+def web_ui_build_info():
+    path = Path(__file__).with_name("build-info.json")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {"build_date": None}
+    except (OSError, json.JSONDecodeError) as exc:
+        raise AdapterError(f"Could not read Web UI build metadata {path}: {exc}") from exc
+    if not isinstance(data, dict) or not isinstance(data.get("build_date"), str):
+        raise AdapterError(f"Invalid Web UI build metadata: {path}")
+    return {"build_date": data["build_date"]}
+
+
 def service_action(action):
     commands = {
         "start": "start",
@@ -105,6 +118,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(200, {
                     **self.qa.info(),
                     "host": self.system.identity(),
+                    "web_ui": web_ui_build_info(),
                     "mock": MOCK_MODE,
                 })
             if path == "/api/status":

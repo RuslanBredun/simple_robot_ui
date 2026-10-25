@@ -5,22 +5,26 @@ read-only four-page React UI with a Python standard-library backend.
 
 ## Scope
 
-- **Info** — the System tab combines product fields from `turret-info` with
-  Web UI version, hostname, OS, CPU architecture, and local IPv4 addresses by
-  network interface; the Guide describes only verified system behavior and
-  marks missing product instructions.
+- **Info** — System shows product/model identifiers and software versions
+  reported by `turret-info`, plus the Web UI version and package build date.
+  Missing STM and camera-module software/board versions are explicitly marked
+  unavailable.
+  The Guide is organized into product overview, Antibag, first startup,
+  package contents, Web UI, and additional modules/integrations.
 - **Diagnostics** — Overview, Charts, and Logs tabs show service state and logs
   from `turret-status` and `turret-logs`, ROS 2 motor/joint/orchestrator
   telemetry, sensor health, and Linux CPU/RAM/CPU-temperature/disk/uptime
-  metrics. Charts sample at 5 Hz and support a synchronized crosshair, pause,
+  metrics. Overview shows application activity, operator connection, turret
+  and weapon state, axes/drives, and sensors; computer and battery metrics are
+  kept in Charts. Charts sample at 5 Hz and support a synchronized crosshair, pause,
   and a 30-second to 15-minute time window. Overview information is grouped
-  into tower, axis/drive, sensor, and computer/power cards; charts are divided
-  into subtabs. Logs can show entries since the main application started or
+  into tower, axis/drive, and sensor cards; charts are divided into subtabs.
+  Logs can show entries since the main application started or
   within a range from 15 minutes to 24 hours. Motor current is converted from
   milliamps to amps; motor voltage and temperature are displayed in volts and
   degrees Celsius. Joint velocities are displayed in degrees per second.
   Battery charge is an explicitly labelled runtime estimate derived from
-  voltage, not BMS SOC; a low-charge warning is shown at 20% or below.
+  voltage, not BMS SOC.
   S360 position/velocity charts are hidden until their data source and units
   are confirmed.
   While hovering, the crosshair stays at a fixed relative position as samples
