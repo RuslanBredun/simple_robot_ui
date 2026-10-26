@@ -16,7 +16,7 @@ export function ToolPanel({ tool, onToolChange, mode, onModeChange, tools, modes
       </label>
     </div>
     <div className="control-tool-buttons">
-      <button type="button" disabled title="Unavailable in mock preview">Fuse</button>
+      <button type="button" disabled title="Unavailable in mock preview">Safety</button>
       <button type="button" disabled title="Activation unavailable in mock preview">Activate</button>
     </div>
   </section>;

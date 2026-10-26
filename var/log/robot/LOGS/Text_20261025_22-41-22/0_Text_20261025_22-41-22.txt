@@ -1,0 +1,5 @@
+# TextLogger session=var/log/robot/LOGS/Text_20261025_22-41-22 file_index=0
+[INFO] [2026-10-25 22:41:23.444] [turret_homing]: Node was successfuly run
+[INFO] [2026-10-25 22:41:24.046] [full_turret]: Node was successfuly run
+[INFO] [2026-10-25 22:41:24.187] [limits_manager]: Node was successfuly run
+[INFO] [2026-10-25 22:41:25.282] [mock_canopen_multi_motor]: Started mock CANopen multi motor node with 2 motor(s)
