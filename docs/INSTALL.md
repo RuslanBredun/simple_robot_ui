@@ -37,6 +37,7 @@ TURRET_WEB_HOST=0.0.0.0
 TURRET_WEB_PORT=8080
 TURRET_WEB_ALLOWED_HOSTS=192.168.88.56
 TURRET_WEB_MODE=real
+TURRET_WEB_FASTDDS_BUILTIN_TRANSPORTS=UDPv4
 ```
 
 `TURRET_WEB_HOST` is the bind address; `0.0.0.0` listens on all interfaces, or use a
@@ -44,6 +45,9 @@ specific Pi interface address. `TURRET_WEB_ALLOWED_HOSTS` is a comma-separated
 list of hostnames/IP addresses clients may use in the URL; it does not include
 the port. Both the listener and allowlist must permit LAN access. `TURRET_WEB_MODE`
 is `real` or `mock`. Keep `real` for the installed device.
+`TURRET_WEB_FASTDDS_BUILTIN_TRANSPORTS` configures Fast DDS for the Web UI
+process only; `UDPv4` avoids shared-memory transport permission issues when
+the service runs under a different Linux user than the robot runtime.
 
 Apply changes with `sudo systemctl restart turret-web.service`, then open
 `http://192.168.88.56:8080` from the workstation. If a previous systemd
