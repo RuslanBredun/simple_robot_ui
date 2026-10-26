@@ -94,7 +94,7 @@ if [ ! -f /var/lib/turret-web/auth.json ]; then
     db_get turret-web/password
     password="$RET"
     if [ -n "$password" ]; then
-        printf '%s\\n' "$password" | /usr/bin/python3 /usr/bin/turret-web-set-password set-stdin
+        printf '%s\n' "$password" | /usr/bin/python3 /usr/bin/turret-web-set-password set-stdin
     else
         /usr/bin/python3 /usr/bin/turret-web-set-password init
     fi
