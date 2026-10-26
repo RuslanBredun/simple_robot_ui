@@ -124,7 +124,7 @@ class RosDiagnosticsAdapter:
             from rob_turret_msgs.msg import GimbalState
             gimbal_state_type = GimbalState
             gimbal_error = None
-        except ImportError as exc:
+        except Exception as exc:
             gimbal_state_type = None
             gimbal_error = f"GimbalState message unavailable: {exc}"
 
@@ -132,7 +132,7 @@ class RosDiagnosticsAdapter:
             from rob_comm_msgs.msg import UARTTelemetry
             uart_telemetry_type = UARTTelemetry
             battery_error = None
-        except ImportError as exc:
+        except Exception as exc:
             uart_telemetry_type = None
             battery_error = f"Battery telemetry unavailable: {exc}"
 
@@ -140,7 +140,7 @@ class RosDiagnosticsAdapter:
             from rob_telem_msgs.msg import SensorHealthReport
             sensor_health_type = SensorHealthReport
             sensors_error = None
-        except ImportError as exc:
+        except Exception as exc:
             sensor_health_type = None
             sensors_error = f"Sensor health unavailable: {exc}"
 
@@ -173,22 +173,31 @@ class RosDiagnosticsAdapter:
             node.create_subscription(WeaponState, "/weapon_state", self._weapon_callback, state_qos)
             node.create_subscription(Bool, "/connection_status", self._connection_callback, state_qos)
             if gimbal_state_type is not None:
-                node.create_subscription(
-                    gimbal_state_type, "/gimbal_state", self._gimbal_callback, state_qos
-                )
+                try:
+                    node.create_subscription(
+                        gimbal_state_type, "/gimbal_state", self._gimbal_callback, state_qos
+                    )
+                except Exception as exc:
+                    gimbal_error = f"Gimbal telemetry unavailable: {exc}"
+            if uart_telemetry_type is not None:
+                try:
+                    node.create_subscription(
+                        uart_telemetry_type, "/uart_telemetry", self._battery_callback, 10
+                    )
+                except Exception as exc:
+                    battery_error = f"Battery telemetry unavailable: {exc}"
+            if sensor_health_type is not None:
+                try:
+                    node.create_subscription(
+                        sensor_health_type, "/telemetry/sensors_health",
+                        self._sensor_health_callback, 10
+                    )
+                except Exception as exc:
+                    sensors_error = f"Sensor health unavailable: {exc}"
             with self._lock:
                 self._state["gimbal_error"] = gimbal_error
                 self._state["battery_error"] = battery_error
                 self._state["sensors_error"] = sensors_error
-            if uart_telemetry_type is not None:
-                node.create_subscription(
-                    uart_telemetry_type, "/uart_telemetry", self._battery_callback, 10
-                )
-            if sensor_health_type is not None:
-                node.create_subscription(
-                    sensor_health_type, "/telemetry/sensors_health",
-                    self._sensor_health_callback, 10
-                )
             with self._lock:
                 self._state.update({"available": True, "error": None})
             while rclpy.ok() and not self._stop.is_set():

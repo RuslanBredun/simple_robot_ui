@@ -4,7 +4,7 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from unittest.mock import patch
@@ -87,6 +87,88 @@ class QaCliTests(unittest.TestCase):
 
 
 class RosDiagnosticsTests(unittest.TestCase):
+    def test_missing_uart_typesupport_does_not_stop_other_ros_diagnostics(self):
+        adapter = RosDiagnosticsAdapter()
+        ros_ok = {"value": False}
+        subscriptions = []
+
+        class Node:
+            def __init__(self, _name):
+                pass
+
+            def create_subscription(self, message_type, topic, _callback, _qos):
+                subscriptions.append((message_type, topic))
+
+            def destroy_node(self):
+                pass
+
+        rclpy = ModuleType("rclpy")
+        rclpy.ok = lambda: ros_ok["value"]
+        rclpy.init = lambda args: ros_ok.update(value=True)
+        rclpy.shutdown = lambda: ros_ok.update(value=False)
+
+        def spin_once(_node, timeout_sec):
+            self.assertEqual(timeout_sec, 0.1)
+            adapter._stop.set()
+
+        rclpy.spin_once = spin_once
+        node_module = ModuleType("rclpy.node")
+        node_module.Node = Node
+        qos_module = ModuleType("rclpy.qos")
+        qos_module.DurabilityPolicy = SimpleNamespace(TRANSIENT_LOCAL=1)
+        qos_module.ReliabilityPolicy = SimpleNamespace(RELIABLE=1)
+        qos_module.QoSProfile = lambda **kwargs: kwargs
+
+        def message_package(package, names):
+            parent = ModuleType(package)
+            parent.__path__ = []
+            messages = ModuleType(f"{package}.msg")
+            for name in names:
+                setattr(messages, name, type(name, (), {}))
+            return parent, messages
+
+        sensor_package, sensor_messages = message_package("sensor_msgs", ["JointState"])
+        std_package, std_messages = message_package("std_msgs", ["Bool"])
+        turret_package, turret_messages = message_package(
+            "rob_turret_msgs", ["CANOpenMotorState", "WeaponState", "GimbalState"]
+        )
+        comm_package, comm_messages = message_package("rob_comm_msgs", [])
+
+        def missing_uart_typesupport(name):
+            if name == "UARTTelemetry":
+                raise RuntimeError(
+                    "Could not import 'rosidl_typesupport_c' for package 'rob_comm_msgs'"
+                )
+            raise AttributeError(name)
+
+        comm_messages.__getattr__ = missing_uart_typesupport
+        telem_package, telem_messages = message_package("rob_telem_msgs", ["SensorHealthReport"])
+        modules = {
+            "rclpy": rclpy,
+            "rclpy.node": node_module,
+            "rclpy.qos": qos_module,
+            "sensor_msgs": sensor_package,
+            "sensor_msgs.msg": sensor_messages,
+            "std_msgs": std_package,
+            "std_msgs.msg": std_messages,
+            "rob_turret_msgs": turret_package,
+            "rob_turret_msgs.msg": turret_messages,
+            "rob_comm_msgs": comm_package,
+            "rob_comm_msgs.msg": comm_messages,
+            "rob_telem_msgs": telem_package,
+            "rob_telem_msgs.msg": telem_messages,
+        }
+
+        with patch.dict("sys.modules", modules):
+            adapter._spin()
+
+        result = adapter.snapshot()
+        self.assertTrue(result["available"])
+        self.assertIsNone(result["error"])
+        self.assertIn("rosidl_typesupport_c", result["battery_error"])
+        self.assertIn("/joint_states", [topic for _, topic in subscriptions])
+        self.assertNotIn("/uart_telemetry", [topic for _, topic in subscriptions])
+
     def test_stop_waits_for_ros_thread_without_shutting_down_context_concurrently(self):
         adapter = RosDiagnosticsAdapter()
         calls = []

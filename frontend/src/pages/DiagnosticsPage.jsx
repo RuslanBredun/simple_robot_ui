@@ -578,6 +578,7 @@ export function DiagnosticsPage() {
         {!diagnostics?.battery && <p className="muted">Телеметрія батареї недоступна.</p>}
         {diagnostics?.battery && !batteryPercentAvailable &&
           <p className="muted">Оцінка заряду недоступна; показується лише напруга батареї.</p>}
+        {diagnostics?.battery_error && <p className="muted">{diagnostics.battery_error}</p>}
       </>}
     </>}
 
