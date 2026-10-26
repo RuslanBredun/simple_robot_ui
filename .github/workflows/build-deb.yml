@@ -26,7 +26,8 @@ jobs:
           npm run build
       - name: Package DEB
         run: |
-          bash packaging/build-deb.sh
+          VERSION="0.5.1+ci.${GITHUB_RUN_NUMBER}" bash packaging/build-deb.sh
+          echo "Built Debian version: 0.5.1+ci.${GITHUB_RUN_NUMBER}"
           dpkg-deb --info dist/*.deb
           dpkg-deb --contents dist/*.deb | grep -E 'server.py|adapters/|start.sh|index.html|turret-web.service|etc/default/turret-web|sudoers.d/turret-web'
       - name: Upload offline DEB

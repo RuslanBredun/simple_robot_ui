@@ -138,3 +138,9 @@ sudo turret-web-set-password show-initial
 ```
 
 The hash is in `/var/lib/turret-web/auth.json` (root:turret-web, 0640); the initial plaintext password is available only to root in `/var/lib/turret-web/initial-password` (0600). Passwords are never shipped in Git or the DEB. Existing credentials are preserved on upgrades. Sessions are stored in memory and expire after 12 hours or service restart; login is rate-limited. Login protects all JSON APIs including service actions. **HTTP does not encrypt passwords**: restrict port 8080 to an isolated trusted network or use a properly configured HTTPS reverse proxy. Do not expose directly to the internet.
+
+### Interactive installation and CI package versions
+
+On first interactive installation, debconf asks for the Web UI password twice (minimum 12 characters). A blank password generates a unique random credential; retrieve it with `sudo turret-web-set-password show-initial`. On upgrade the existing credential is preserved and no prompt is shown. For a manual password change, run `sudo turret-web-set-password set-stdin` and type the new password via stdin, then restart `turret-web.service`. Unattended installations use the random-password fallback. The debconf answers are cleared after configuration.
+
+GitHub Actions produces Debian versions `0.5.1+ci.<run_number>` (e.g. `0.5.1+ci.125`). The file name includes the version. Install a newer build with `sudo apt install ./turret-web_0.5.1+ci.125_all.deb`; do not uninstall the old package. A repeated run number is not a newer version; use the latest workflow run artifact.

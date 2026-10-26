@@ -171,3 +171,9 @@ sudo turret-web-set-password show-initial
 The credential hash lives in `/var/lib/turret-web/auth.json` (0640 root:turret-web). The initial plaintext password lives in `/var/lib/turret-web/initial-password` (0600 root-only). The server uses 12-hour in-memory sessions and HttpOnly SameSite=Strict cookies. Login, logout, and session-check endpoints are `/api/auth/login`, `/api/auth/logout`, `/api/auth/session`. All other `/api/*` endpoints require authentication. A service restart clears all sessions.
 
 **Security:** Password login does not encrypt HTTP traffic. LAN access should be limited to a physically trusted/isolated network until TLS is deployed. The service is not safe to expose directly to the public internet. HTTPS proxy setups should terminate TLS correctly and enable `TURRET_WEB_TRUST_PROXY=1` only behind a trusted proxy.
+
+### Interactive DEB password setup and upgrade versioning
+
+First interactive `apt install ./turret-web_*.deb` asks for a password and confirmation via debconf. Use at least 12 characters. Blank answers generate a unique random password (retrieve with `sudo turret-web-set-password show-initial`). Existing credentials are not overwritten on upgrades. For unattended installations, a unique random password is generated automatically. To set a password without reinstalling, use `sudo turret-web-set-password set-stdin` (reads a line from standard input) followed by `sudo systemctl restart turret-web.service`.
+
+CI packages are versioned `0.5.1+ci.<GITHUB_RUN_NUMBER>`. Check with `dpkg-deb -f ./turret-web_*.deb Version` and compare with `dpkg-query -W -f='${Version}\\n' turret-web`. Install the newer artifact using `sudo apt install ./turret-web_0.5.1+ci.N_all.deb` without removing the old package. The version must increase for an upgrade; GitHub reruns of the same workflow run reuse the same run number.
