@@ -1,5 +1,5 @@
 # Web UI listener settings. Edit /etc/default/turret-web and restart the service.
-TURRET_WEB_HOST=127.0.0.1
+TURRET_WEB_HOST=0.0.0.0
 TURRET_WEB_PORT=8080
-TURRET_WEB_ALLOWED_HOSTS=
+TURRET_WEB_ALLOWED_HOSTS=192.168.88.56
 TURRET_WEB_MODE=real

@@ -27,15 +27,15 @@ if [[ ! -r "$ROS_SETUP" ]]; then
     echo "ROS setup is missing: $ROS_SETUP" >&2
     exit 1
 fi
-if [[ ! -r "$OVERLAY_SETUP" ]]; then
-    echo "Robot message overlay is missing: $OVERLAY_SETUP" >&2
-    exit 1
-fi
 
 export ROS_HOME=/var/lib/turret-web/ros
 export ROS_LOG_DIR=/var/lib/turret-web/ros
+set +u
 source "$ROS_SETUP"
-source "$OVERLAY_SETUP"
+if [[ -r "$OVERLAY_SETUP" ]]; then
+    source "$OVERLAY_SETUP"
+fi
+set -u
 
 python3 -c 'import rclpy; from sensor_msgs.msg import JointState; from std_msgs.msg import Bool; from rob_turret_msgs.msg import CANOpenMotorState, WeaponState; print("Required ROS imports: OK")'
 printf 'ROS_DISTRO=%s ROS_DOMAIN_ID=%s RMW_IMPLEMENTATION=%s\n' \

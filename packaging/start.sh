@@ -17,4 +17,8 @@ if [[ -r /opt/robot/ros/local_setup.bash ]]; then
     set -u
 fi
 
+export ROS_HOME=/var/lib/turret-web/ros
+export ROS_LOG_DIR=/var/lib/turret-web/ros
+mkdir -p "$ROS_HOME" "$ROS_LOG_DIR"
+
 exec /usr/bin/python3 /opt/turret-web/server.py

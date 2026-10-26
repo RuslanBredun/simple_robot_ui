@@ -22,15 +22,15 @@ journalctl -u turret-web.service -n 50 --no-pager
 curl http://127.0.0.1:8080/api/status
 ```
 
-By default the service listens only on the Pi at `http://127.0.0.1:8080`.
-To configure its network listener without reinstalling, edit
+The shipped defaults allow LAN access at `http://192.168.88.56:8080`.
+To change the network listener without reinstalling, edit
 `/etc/default/turret-web`:
 
 ```bash
 sudoedit /etc/default/turret-web
 ```
 
-Example for direct access from a trusted LAN:
+The default values are:
 
 ```bash
 TURRET_WEB_HOST=0.0.0.0
@@ -39,7 +39,7 @@ TURRET_WEB_ALLOWED_HOSTS=192.168.88.56
 TURRET_WEB_MODE=real
 ```
 
-`TURRET_WEB_HOST` is the bind address; use `0.0.0.0` for all interfaces or a
+`TURRET_WEB_HOST` is the bind address; `0.0.0.0` listens on all interfaces, or use a
 specific Pi interface address. `TURRET_WEB_ALLOWED_HOSTS` is a comma-separated
 list of hostnames/IP addresses clients may use in the URL; it does not include
 the port. Both the listener and allowlist must permit LAN access. `TURRET_WEB_MODE`
@@ -52,10 +52,16 @@ override sets these `TURRET_WEB_*` variables, remove those entries so
 a trusted network; the UI has no login.
 
 The UI reads the latest 100 logs; status and logs refresh every 5 seconds.
-ROS telemetry is sampled at 5 Hz. For live ROS data, `ROS_DISTRO` must be set
-in `/usr/share/robot/environment/full.env`, and the robot overlay must exist
-at `/opt/robot/ros`. If ROS is unavailable, the web service still starts and
-reports that telemetry is unavailable.
+ROS telemetry is sampled at 5 Hz. For live ROS data, `ROS_DISTRO` and the
+runtime ROS paths must be set in `/usr/share/robot/environment/full.env`, and
+the packaged message overlay must exist at `/opt/robot/ros`. The runtime
+package may provide this selective overlay without a top-level
+`local_setup.bash`; the Web UI uses the paths from `full.env` and sources the
+ROS distribution setup. If ROS is unavailable, the web service still starts
+and reports that telemetry is unavailable.
+The System charts show Raspberry Pi CPU, RAM, and temperature. Axes and Motors
+charts require live ROS topics; they remain empty if the runtime does not
+publish those topics or the Web UI cannot discover them.
 
 The runtime packaging script generates `full.env` with `ROS_DISTRO` (default
 `jazzy`), `ROS_DOMAIN_ID` (default `10`), and
@@ -74,7 +80,9 @@ curl -s http://127.0.0.1:8080/api/diagnostics
 ```
 
 Run the packaged preflight as the service user to verify required imports and
-inspect topics visible in its ROS domain:
+inspect topics visible in its ROS domain. The top-level robot overlay
+`local_setup.bash` is optional when its installed paths are already configured
+in `full.env`:
 
 ```bash
 sudo -u turret-web /usr/bin/turret-web-ros-check
@@ -87,7 +95,9 @@ preflight lists topics but does not fail when publishers are absent, since the
 runtime may be stopped. This source workspace does not contain the deployed
 `full.env` or `/opt/robot/ros` overlay, and does not have the `turret-web`
 account, so the service-user check must be completed on a device with the
-robot DEB installed.
+robot DEB installed. The Web UI redirects its ROS logs to its private writable
+state directory `/var/lib/turret-web/ros`; it does not write into the runtime's
+`/var/log/robot/ros`.
 
 The Overview tab provides confirmed Start, Stop, and Restart actions for
 `turret.service`. Mock Mode disables all service actions.

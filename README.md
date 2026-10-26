@@ -34,9 +34,9 @@ read-only four-page React UI with a Python standard-library backend.
 - **Control** — live, read-only turret/weapon/connection status from ROS diagnostics, alongside local camera/profile selectors, normalized joystick preview, Enable/Slow toggles, and tool/mode selectors. Homing, fuse, and activation actions are disabled. No ROS commands, control-source registration, tool activation, or live video are connected.
 - **Settings** — unavailable.
 
-The server defaults to **127.0.0.1:8080**. On-device listener settings can be
-changed in `/etc/default/turret-web` without reinstalling the package; direct
-LAN access requires configuring both the bind address and allowed host list.
+The packaged defaults listen on **0.0.0.0:8080** and allow the host
+`192.168.88.56`. On-device listener settings can be changed in
+`/etc/default/turret-web` without reinstalling the package.
 Service actions are available only in the Overview tab, require confirmation,
 and are allowlisted to `turret.service`. They are disabled in Mock Mode. No
 authentication is included; do not expose the service to untrusted networks.
