@@ -410,3 +410,11 @@ p { line-height: 1.6; color: #b6c3d5; }
   .control-video-placeholder { min-height: 200px; }
   .control-block { padding: 14px; }
 }
+
+/* Authentication is the only new view; existing page layouts are unchanged. */
+.auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.auth-form { width: min(100%, 400px); display: grid; gap: 12px; }
+.auth-form h1 { margin: 0; }
+.auth-form label { font-size: 13px; color: #acbad0; }
+.auth-form input { background: #0c1627; color: #fff; border: 1px solid #415677; border-radius: 9px; padding: 12px; min-height: 44px; }
+.auth-form button { background: #2464a9; color: #fff; border: 1px solid #3983d3; border-radius: 9px; padding: 12px; min-height: 44px; }

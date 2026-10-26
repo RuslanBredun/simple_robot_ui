@@ -323,6 +323,13 @@ class RosDiagnosticsTests(unittest.TestCase):
 class HttpApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        from auth import AuthManager, password_record
+        cls.auth_temp = tempfile.TemporaryDirectory()
+        auth_file = Path(cls.auth_temp.name) / "auth.json"
+        auth_file.write_text(json.dumps(password_record("test-password")), encoding="utf-8")
+        cls.original_auth = server.Handler.auth
+        server.Handler.auth = AuthManager(auth_file)
+        cls.auth_token, _ = server.Handler.auth.login("test-password", "fixture")
         cls.original_port = server.PORT
         cls.httpd = server.ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
         server.PORT = cls.httpd.server_address[1]
@@ -340,11 +347,20 @@ class HttpApiTests(unittest.TestCase):
         cls.httpd.server_close()
         cls.thread.join(timeout=2)
         server.PORT = cls.original_port
+        server.Handler.auth = cls.original_auth
+        cls.auth_temp.cleanup()
+
+    def auth_urlopen(self, request):
+        from urllib.request import urlopen as actual_urlopen
+        if isinstance(request, str):
+            request = Request(request)
+        request.add_unredirected_header("Cookie", "turret_web_session=" + self.auth_token)
+        return actual_urlopen(request)
 
     def test_read_only_info_and_diagnostics_endpoints(self):
-        with urlopen(f"{self.base}/api/info") as response:
+        with self.auth_urlopen(f"{self.base}/api/info") as response:
             info = json.loads(response.read())
-        with urlopen(f"{self.base}/api/diagnostics") as response:
+        with self.auth_urlopen(f"{self.base}/api/diagnostics") as response:
             diagnostics = json.loads(response.read())
         self.assertEqual(info["fields"]["MODEL"], "mock_turret")
         self.assertTrue(diagnostics["ros"]["available"])
@@ -358,11 +374,11 @@ class HttpApiTests(unittest.TestCase):
         url = f"{self.base}/api/health"
         request = Request(url, headers={"Host": f"192.168.88.56:{server.PORT}"})
         with self.assertRaises(HTTPError) as raised:
-            urlopen(request)
+            self.auth_urlopen(request)
         self.assertEqual(raised.exception.code, 403)
 
         with patch.dict("os.environ", {"TURRET_WEB_ALLOWED_HOSTS": "192.168.88.56"}):
-            with urlopen(request) as response:
+            with self.auth_urlopen(request) as response:
                 self.assertEqual(response.status, 200)
                 self.assertTrue(json.loads(response.read())["ok"])
             self.assertIn(
@@ -384,14 +400,14 @@ class HttpApiTests(unittest.TestCase):
 
     def test_logs_endpoint_accepts_allowlisted_time_range(self):
         with patch.object(server.Handler.qa, "logs", wraps=server.Handler.qa.logs) as logs:
-            with urlopen(f"{self.base}/api/logs?range=6h") as response:
+            with self.auth_urlopen(f"{self.base}/api/logs?range=6h") as response:
                 result = json.loads(response.read())
         self.assertEqual(result["source"], "mock")
         logs.assert_called_once_with("6h")
 
     def test_logs_endpoint_rejects_unsupported_time_range(self):
         with self.assertRaises(HTTPError) as raised:
-            urlopen(f"{self.base}/api/logs?range=unexpected")
+            self.auth_urlopen(f"{self.base}/api/logs?range=unexpected")
         self.assertEqual(raised.exception.code, 400)
 
     def test_service_actions_run_after_valid_origin(self):
@@ -403,7 +419,7 @@ class HttpApiTests(unittest.TestCase):
                 headers={"Origin": "http://attacker.example"},
             )
             with self.subTest(action=action), self.assertRaises(HTTPError) as raised:
-                urlopen(request)
+                self.auth_urlopen(request)
             self.assertEqual(raised.exception.code, 403)
 
     def test_service_actions_use_only_fixed_units_and_commands(self):
@@ -436,7 +452,7 @@ class HttpApiTests(unittest.TestCase):
                     data=b"{}",
                     headers={"Origin": self.base},
                 )
-                with urlopen(request) as response:
+                with self.auth_urlopen(request) as response:
                     result = json.loads(response.read())
                 self.assertEqual(result, {"ok": True, "action": action})
         self.assertEqual(service_action.call_count, 3)
@@ -450,25 +466,25 @@ class HttpApiTests(unittest.TestCase):
                 headers={"Origin": self.base},
             )
             with self.assertRaises(HTTPError) as raised:
-                urlopen(request)
+                self.auth_urlopen(request)
         self.assertEqual(raised.exception.code, 403)
         action.assert_not_called()
 
     def test_unknown_service_actions_do_not_exist(self):
-        request = Request(f"{self.base}/api/enable", method="POST", data=b"{}")
+        request = Request(f"{self.base}/api/enable", method="POST", data=b"{}", headers={"Origin": self.base})
         with self.assertRaises(HTTPError) as raised:
-            urlopen(request)
+            self.auth_urlopen(request)
         self.assertEqual(raised.exception.code, 404)
 
     def test_diagnostic_export_is_not_available(self):
         with self.assertRaises(HTTPError) as raised:
-            urlopen(f"{self.base}/api/diagnostics/export")
+            self.auth_urlopen(f"{self.base}/api/diagnostics/export")
         self.assertEqual(raised.exception.code, 404)
 
     def test_unrecognized_host_is_rejected(self):
         request = Request(f"{self.base}/api/health", headers={"Host": "attacker.example"})
         with self.assertRaises(HTTPError) as raised:
-            urlopen(request)
+            self.auth_urlopen(request)
         self.assertEqual(raised.exception.code, 403)
 
 
@@ -486,5 +502,77 @@ class SystemMetricsTests(unittest.TestCase):
         self.assertEqual(identity["network_interfaces"][0]["ipv4_address"], "192.168.1.42")
 
 
+class AuthenticationTests(unittest.TestCase):
+    def test_password_hash_and_verification(self):
+        from auth import password_record, verify_password
+        record = password_record("unique-example-password")
+        self.assertNotIn("unique-example-password", json.dumps(record))
+        self.assertTrue(verify_password("unique-example-password", record))
+        self.assertFalse(verify_password("incorrect", record))
+
+    def test_sessions_expire_and_logout(self):
+        from auth import AuthManager, password_record, session_cookie
+        with tempfile.TemporaryDirectory() as directory:
+            file = Path(directory) / "auth.json"
+            file.write_text(json.dumps(password_record("passphrase")), encoding="utf-8")
+            manager = AuthManager(file)
+            token, error = manager.login("passphrase", "test-client")
+            self.assertIsNone(error)
+            cookie = session_cookie(token)
+            self.assertTrue(manager.authenticated(cookie))
+            manager.logout(cookie)
+            self.assertFalse(manager.authenticated(cookie))
+
+    def test_rate_limit_rejects_repeated_failures(self):
+        from auth import AuthManager, password_record
+        with tempfile.TemporaryDirectory() as directory:
+            file = Path(directory) / "auth.json"
+            file.write_text(json.dumps(password_record("correct")), encoding="utf-8")
+            manager = AuthManager(file)
+            for _ in range(5):
+                self.assertEqual(manager.login("bad", "test-client")[0], None)
+            self.assertEqual(manager.login("correct", "test-client")[1],
+                             "Too many attempts; retry later")
+
+    def test_http_authentication_flow(self):
+        from auth import AuthManager, password_record
+        with tempfile.TemporaryDirectory() as directory:
+            file = Path(directory) / "auth.json"
+            file.write_text(json.dumps(password_record("test-pass")), encoding="utf-8")
+            manager = AuthManager(file)
+            with patch.object(server.Handler, "auth", manager):
+                httpd = server.ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+                port = httpd.server_address[1]
+                with patch.object(server, "PORT", port):
+                    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+                    thread.start()
+                    base = f"http://127.0.0.1:{port}"
+                    try:
+                        with self.assertRaises(HTTPError) as raised:
+                            urlopen(base + "/api/diagnostics")
+                        self.assertEqual(raised.exception.code, 401)
+                        request = Request(base + "/api/auth/login",
+                            data=json.dumps({"password": "test-pass"}).encode(),
+                            headers={"Origin": base, "Content-Type": "application/json"},
+                            method="POST")
+                        with urlopen(request) as response:
+                            cookie = response.headers["Set-Cookie"].split(";", 1)[0]
+                        with urlopen(Request(base + "/api/diagnostics",
+                                            headers={"Cookie": cookie})) as response:
+                            self.assertEqual(response.status, 200)
+                        logout = Request(base + "/api/auth/logout", data=b"{}",
+                            method="POST", headers={"Origin": base, "Cookie": cookie})
+                        with urlopen(logout) as response:
+                            self.assertEqual(response.status, 200)
+                        with self.assertRaises(HTTPError) as raised:
+                            urlopen(Request(base + "/api/diagnostics",
+                                            headers={"Cookie": cookie}))
+                        self.assertEqual(raised.exception.code, 401)
+                    finally:
+                        httpd.shutdown()
+                        httpd.server_close()
+                        thread.join(timeout=2)
+
 if __name__ == "__main__":
     unittest.main()
+

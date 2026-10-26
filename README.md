@@ -43,14 +43,14 @@ authentication is included; do not expose the service to untrusted networks.
 
 ## Installation (offline on Raspberry Pi / Ubuntu)
 
-1. Download `turret-web_0.5.0_all.deb` from the GitHub Actions **Build DEB**
+1. Download `turret-web_0.5.1_all.deb` from the GitHub Actions **Build DEB**
    run artifacts.
 2. Verify that the robot runtime and `python3`, `systemd`, and `adduser` are
    installed.
 3. Install:
 
    ```bash
-   sudo apt install ./turret-web_0.5.0_all.deb
+   sudo apt install ./turret-web_0.5.1_all.deb
    sudo systemctl status turret-web.service
    ```
 
@@ -120,3 +120,21 @@ Firmware inventory, richer ROS diagnostics, Extended Settings/Control,
 authentication, and Factory AP / Field Ethernet access policy.
 
 See [architecture](docs/ARCHITECTURE.md) and [installation](docs/INSTALL.md).
+
+## Password login (v0.5.1)
+
+The installer creates a unique random initial password on first installation. Retrieve it **on the Pi**, as root:
+
+```bash
+sudo turret-web-set-password show-initial
+```
+
+Change the password (generates a new random password) and invalidate sessions by restarting:
+
+```bash
+sudo turret-web-set-password rotate
+sudo systemctl restart turret-web.service
+sudo turret-web-set-password show-initial
+```
+
+The hash is in `/var/lib/turret-web/auth.json` (root:turret-web, 0640); the initial plaintext password is available only to root in `/var/lib/turret-web/initial-password` (0600). Passwords are never shipped in Git or the DEB. Existing credentials are preserved on upgrades. Sessions are stored in memory and expire after 12 hours or service restart; login is rate-limited. Login protects all JSON APIs including service actions. **HTTP does not encrypt passwords**: restrict port 8080 to an isolated trusted network or use a properly configured HTTPS reverse proxy. Do not expose directly to the internet.

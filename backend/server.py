@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Loopback-only, read-only maintenance HTTP server."""
+"""Authenticated maintenance HTTP server."""
 import json
 import os
 import re
@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from auth import AuthManager, session_cookie
 from adapters.qa_cli import LOG_RANGES, AdapterError, QaCliAdapter
 from adapters.ros_diagnostics import RosDiagnosticsAdapter
 from adapters.system_metrics import SystemMetricsAdapter
@@ -19,6 +20,7 @@ STATIC = Path(os.environ.get("TURRET_WEB_STATIC", Path(__file__).parent / "stati
 if not os.environ.get("TURRET_WEB_STATIC") and not STATIC.is_dir():
     STATIC = Path(__file__).resolve().parents[1] / "frontend" / "dist"
 MOCK_MODE = os.environ.get("TURRET_WEB_MODE", "real").lower() == "mock"
+AUTH = AuthManager()
 
 
 def allowed_hosts():
@@ -79,6 +81,13 @@ class Handler(BaseHTTPRequestHandler):
     qa = QaCliAdapter(mock=MOCK_MODE)
     ros = RosDiagnosticsAdapter(mock=MOCK_MODE)
     system = SystemMetricsAdapter(mock=MOCK_MODE)
+    auth = AUTH
+
+    def is_authenticated(self):
+        return self.auth.authenticated(self.headers.get("Cookie"))
+
+    def secure_cookie(self):
+        return self.headers.get("X-Forwarded-Proto") == "https" and os.environ.get("TURRET_WEB_TRUST_PROXY") == "1"
 
     def valid_host(self):
         return self.headers.get("Host") in allowed_hosts()
@@ -126,6 +135,11 @@ class Handler(BaseHTTPRequestHandler):
         if path in {"/", "/assets/"} or path.startswith("/assets/"):
             return self.serve_static(path)
 
+        if path == "/api/auth/session":
+            return self.respond(200, {"authenticated": self.is_authenticated()})
+        if path.startswith("/api/") and not self.is_authenticated():
+            return self.respond(401, {"error": "Authentication required"})
+
         try:
             if path == "/api/health":
                 return self.respond(200, {"ok": True, "mode": "mock" if MOCK_MODE else "real"})
@@ -161,15 +175,38 @@ class Handler(BaseHTTPRequestHandler):
         return self.respond(404, {"error": "Not found"})
 
     def do_POST(self):
-        action = urlparse(self.path).path.removeprefix("/api/")
-        if action not in {"start", "stop", "restart"} or urlparse(self.path).path != f"/api/{action}":
-            return self.respond(404, {"error": "Not found"})
-        if MOCK_MODE:
-            return self.respond(403, {"error": "Service actions are disabled in mock mode"})
+        path = urlparse(self.path).path
         if not self.valid_host():
             return self.respond(403, {"error": "Invalid host"})
         if self.headers.get("Origin") not in allowed_origins():
             return self.respond(403, {"error": "Invalid origin"})
+        if path == "/api/auth/login":
+            try:
+                size = int(self.headers.get("Content-Length", "0"))
+                if size < 1 or size > 4096:
+                    return self.respond(400, {"error": "Invalid request size"})
+                payload = json.loads(self.rfile.read(size))
+                password = payload.get("password")
+                if not isinstance(password, str) or not password or len(password) > 512:
+                    return self.respond(400, {"error": "Invalid password"})
+            except (ValueError, TypeError, AttributeError):
+                return self.respond(400, {"error": "Invalid JSON"})
+            token, error = self.auth.login(password, self.client_address[0])
+            if error:
+                return self.respond(429 if error.startswith("Too many") else 401, {"error": error})
+            return self.respond(200, {"authenticated": True}, {
+                "Set-Cookie": session_cookie(token, secure=self.secure_cookie())})
+        if not self.is_authenticated():
+            return self.respond(401, {"error": "Authentication required"})
+        if path == "/api/auth/logout":
+            self.auth.logout(self.headers.get("Cookie"))
+            return self.respond(200, {"authenticated": False}, {
+                "Set-Cookie": session_cookie("", secure=self.secure_cookie(), clear=True)})
+        action = path.removeprefix("/api/")
+        if action not in {"start", "stop", "restart"} or path != f"/api/{action}":
+            return self.respond(404, {"error": "Not found"})
+        if MOCK_MODE:
+            return self.respond(403, {"error": "Service actions are disabled in mock mode"})
         try:
             service_action(action)
         except AdapterError as exc:

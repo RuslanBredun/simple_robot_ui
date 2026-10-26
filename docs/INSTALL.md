@@ -16,7 +16,7 @@ systemctl status turret.service
 Download the `turret-web-deb` artifact from GitHub Actions:
 
 ```bash
-sudo apt install ./turret-web_0.5.0_all.deb
+sudo apt install ./turret-web_0.5.1_all.deb
 sudo systemctl status turret-web.service
 journalctl -u turret-web.service -n 50 --no-pager
 curl http://127.0.0.1:8080/api/status
@@ -151,3 +151,23 @@ aggregated status and must not be overwritten to register the Web UI. Do not
 connect the preview directly to shared actuation topics. A future integration
 requires the shared Communication Layer / core application API and a
 browser-compatible video gateway with a verified model-specific stream map.
+
+## Authentication (v0.5.1)
+
+After installation, retrieve the unique initial password locally:
+
+```bash
+sudo turret-web-set-password show-initial
+```
+
+The password is generated once and is preserved across package upgrades. To rotate it:
+
+```bash
+sudo turret-web-set-password rotate
+sudo systemctl restart turret-web.service
+sudo turret-web-set-password show-initial
+```
+
+The credential hash lives in `/var/lib/turret-web/auth.json` (0640 root:turret-web). The initial plaintext password lives in `/var/lib/turret-web/initial-password` (0600 root-only). The server uses 12-hour in-memory sessions and HttpOnly SameSite=Strict cookies. Login, logout, and session-check endpoints are `/api/auth/login`, `/api/auth/logout`, `/api/auth/session`. All other `/api/*` endpoints require authentication. A service restart clears all sessions.
+
+**Security:** Password login does not encrypt HTTP traffic. LAN access should be limited to a physically trusted/isolated network until TLS is deployed. The service is not safe to expose directly to the public internet. HTTPS proxy setups should terminate TLS correctly and enable `TURRET_WEB_TRUST_PROXY=1` only behind a trusted proxy.
