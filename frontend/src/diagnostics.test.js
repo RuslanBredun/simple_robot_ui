@@ -6,6 +6,7 @@ import {
   chartEndAt,
   isFresh,
   nearestSample,
+  telemetrySample,
 } from './diagnostics.js';
 
 test('chart history stores timestamped values and enforces its retention limit', () => {
@@ -35,6 +36,17 @@ test('stale telemetry is rejected after the freshness threshold', () => {
   assert.ok(isFresh({ age_seconds: 2 }));
   assert.equal(isFresh({ age_seconds: 2.01 }), false);
   assert.equal(isFresh({}), false);
+});
+
+test('ROS telemetry samples require a fresh, new, timestamped finite value', () => {
+  const item = { age_seconds: 0.2, received_at: '2026-10-26T15:00:00.000Z' };
+  const at = Date.parse(item.received_at);
+
+  assert.deepEqual(telemetrySample(item, 12, at - 1), { at, value: 12 });
+  assert.equal(telemetrySample(item, 12, at), null);
+  assert.equal(telemetrySample({ ...item, age_seconds: 2.1 }, 12), null);
+  assert.equal(telemetrySample(item, Number.NaN), null);
+  assert.equal(telemetrySample({ ...item, received_at: 'invalid' }, 12), null);
 });
 
 test('crosshair selection preserves the timestamp of the actual nearest sample', () => {

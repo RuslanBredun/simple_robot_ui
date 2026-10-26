@@ -10,6 +10,13 @@ export function isFresh(item, maxAgeSeconds = 2) {
   return item && Number.isFinite(item.age_seconds) && item.age_seconds <= maxAgeSeconds;
 }
 
+export function telemetrySample(item, value, previousAt = -Infinity) {
+  if (!isFresh(item) || !Number.isFinite(value)) return null;
+  const at = Date.parse(item.received_at);
+  if (!Number.isFinite(at) || at <= previousAt) return null;
+  return { at, value };
+}
+
 export function chartEndAt(paused, pausedAt, now = Date.now()) {
   return paused && Number.isFinite(pausedAt) ? pausedAt : now;
 }

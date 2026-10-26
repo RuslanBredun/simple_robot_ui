@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { ValueChart } from '../components/ValueChart.jsx';
-import { appendSample, chartEndAt, isFresh } from '../diagnostics.js';
+import { appendSample, chartEndAt, isFresh, telemetrySample } from '../diagnostics.js';
 
 const SAMPLE_INTERVAL_MS = 200;
 const tabs = [
@@ -133,6 +133,7 @@ export function DiagnosticsPage() {
   const [logsPaused, setLogsPaused] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const logViewRef = useRef(null);
+  const lastRosSampleAt = useRef({});
 
   useEffect(() => {
     api('health')
@@ -163,38 +164,42 @@ export function DiagnosticsPage() {
         if (!stopped) {
           setDiagnostics(data.ros);
           setErrors((previous) => ({ ...previous, ros: '' }));
+          const rosSamples = [];
+          const queueRosSample = (key, item, value) => {
+            const sample = telemetrySample(item, value, lastRosSampleAt.current[key]);
+            if (!sample) return;
+            lastRosSampleAt.current[key] = sample.at;
+            rosSamples.push({ key, ...sample });
+          };
+          for (const [name, item] of Object.entries(data.ros.motors || {})) {
+            queueRosSample(`motor:${name}`, item, item.current);
+            queueRosSample(`motor-voltage:${name}`, item, item.voltage);
+            queueRosSample(`motor-temperature:${name}`, item, item.temperature);
+          }
+          for (const [name, item] of Object.entries(data.ros.joints || {})) {
+            queueRosSample(`joint:${name}`, item, item.position);
+            queueRosSample(
+              `velocity:${name}`,
+              item,
+              Number.isFinite(item.velocity) ? item.velocity * 180 / Math.PI : null
+            );
+          }
+          queueRosSample('system:battery', data.ros.battery, data.ros.battery?.voltage_v);
+          queueRosSample(
+            'system:battery-percent',
+            data.ros.battery,
+            data.ros.battery?.is_live && isPercent(data.ros.battery.charge_percent)
+              ? data.ros.battery.charge_percent
+              : null
+          );
           setSamples((previous) => {
             let next = previous;
-            for (const [name, item] of Object.entries(data.ros.motors || {})) {
-              next = appendSample(next, `motor:${name}`, item.current);
-              next = appendSample(next, `motor-voltage:${name}`, item.voltage);
-              next = appendSample(next, `motor-temperature:${name}`, item.temperature);
-            }
-            for (const [name, item] of Object.entries(data.ros.joints || {})) {
-              next = appendSample(next, `joint:${name}`, item.position);
-              next = appendSample(
-                next,
-                `velocity:${name}`,
-                Number.isFinite(item.velocity) ? item.velocity * 180 / Math.PI : null
-              );
+            for (const sample of rosSamples) {
+              next = appendSample(next, sample.key, sample.value, sample.at);
             }
             next = appendSample(next, 'system:cpu', data.system?.cpu_percent);
             next = appendSample(next, 'system:memory', data.system?.memory_percent);
             next = appendSample(next, 'system:temperature', data.system?.cpu_temperature_c);
-            next = appendSample(
-              next,
-              'system:battery',
-              data.ros.battery?.age_seconds <= 2 ? data.ros.battery.voltage_v : null
-            );
-            next = appendSample(
-              next,
-              'system:battery-percent',
-              data.ros.battery?.age_seconds <= 2 &&
-                data.ros.battery.is_live &&
-                isPercent(data.ros.battery.charge_percent)
-                ? data.ros.battery.charge_percent
-                : null
-            );
             return next;
           });
         }
