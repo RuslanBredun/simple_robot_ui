@@ -144,3 +144,12 @@ The hash is in `/var/lib/turret-web/auth.json` (root:turret-web, 0640); the init
 On first interactive installation, debconf asks for the Web UI password twice (minimum 12 characters). A blank password generates a unique random credential; retrieve it with `sudo turret-web-set-password show-initial`. On upgrade the existing credential is preserved and no prompt is shown. For a manual password change, run `sudo turret-web-set-password set-stdin` and type the new password via stdin, then restart `turret-web.service`. Unattended installations use the random-password fallback. The debconf answers are cleared after configuration.
 
 GitHub Actions produces Debian versions `0.5.1+ci.<run_number>` (e.g. `0.5.1+ci.125`). The file name includes the version. Install a newer build with `sudo apt install ./turret-web_0.5.1+ci.125_all.deb`; do not uninstall the old package. A repeated run number is not a newer version; use the latest workflow run artifact.
+
+To change the password interactively (hidden input, confirmation, minimum 12 characters):
+
+```bash
+sudo turret-web-set-password
+sudo systemctl restart turret-web.service
+```
+
+The command does not echo passwords, does not require reinstalling the package, and does not change existing credentials if confirmation fails. `set-stdin` remains available for automation; `rotate` generates a random password.
