@@ -244,6 +244,20 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual(info["host"]["os_name"], "Ubuntu (mock)")
         self.assertIsNone(info["web_ui"]["build_date"])
 
+    def test_lan_host_is_allowed_only_when_configured(self):
+        request = Request(self.base, headers={"Host": f"192.168.88.56:{server.PORT}"})
+        with self.assertRaises(HTTPError) as raised:
+            urlopen(request)
+        self.assertEqual(raised.exception.code, 403)
+
+        with patch.dict("os.environ", {"TURRET_WEB_ALLOWED_HOSTS": "192.168.88.56"}):
+            with urlopen(request) as response:
+                self.assertEqual(response.status, 200)
+            self.assertIn(
+                f"http://192.168.88.56:{server.PORT}",
+                server.allowed_origins(),
+            )
+
     def test_web_ui_build_date_is_loaded_from_packaged_metadata(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

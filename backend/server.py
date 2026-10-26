@@ -21,6 +21,21 @@ if not os.environ.get("TURRET_WEB_STATIC") and not STATIC.is_dir():
 MOCK_MODE = os.environ.get("TURRET_WEB_MODE", "real").lower() == "mock"
 
 
+def allowed_hosts():
+    configured = os.environ.get("TURRET_WEB_ALLOWED_HOSTS", "")
+    hosts = {"localhost", "127.0.0.1"}
+    hosts.update(host.strip() for host in configured.split(",") if host.strip())
+    return {f"{host}:{PORT}" for host in hosts}
+
+
+def allowed_origins():
+    return {
+        *(f"http://{host}" for host in allowed_hosts()),
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    }
+
+
 def web_ui_build_info():
     path = Path(__file__).with_name("build-info.json")
     try:
@@ -65,6 +80,9 @@ class Handler(BaseHTTPRequestHandler):
     ros = RosDiagnosticsAdapter(mock=MOCK_MODE)
     system = SystemMetricsAdapter(mock=MOCK_MODE)
 
+    def valid_host(self):
+        return self.headers.get("Host") in allowed_hosts()
+
     def respond(self, code, payload, headers=None):
         data = json.dumps(payload).encode("utf-8")
         self.send_response(code)
@@ -102,10 +120,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        if self.headers.get("Host") not in {
-            f"localhost:{PORT}",
-            f"127.0.0.1:{PORT}",
-        }:
+        if not self.valid_host():
             return self.respond(403, {"error": "Invalid host"})
         path = urlparse(self.path).path
         if path in {"/", "/assets/"} or path.startswith("/assets/"):
@@ -151,17 +166,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond(404, {"error": "Not found"})
         if MOCK_MODE:
             return self.respond(403, {"error": "Service actions are disabled in mock mode"})
-        if self.headers.get("Host") not in {
-            f"localhost:{PORT}",
-            f"127.0.0.1:{PORT}",
-        }:
+        if not self.valid_host():
             return self.respond(403, {"error": "Invalid host"})
-        if self.headers.get("Origin") not in {
-            f"http://localhost:{PORT}",
-            f"http://127.0.0.1:{PORT}",
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-        }:
+        if self.headers.get("Origin") not in allowed_origins():
             return self.respond(403, {"error": "Invalid origin"})
         try:
             service_action(action)

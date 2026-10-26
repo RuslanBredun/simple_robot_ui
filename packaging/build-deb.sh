@@ -6,7 +6,7 @@ BUILD_DATE="$(date -u +%F)"
 test -f "$ROOT/frontend/dist/index.html" || { echo "Build frontend first: npm run build" >&2; exit 1; }
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
-mkdir -p "$STAGE/DEBIAN" "$STAGE/opt/turret-web/static" "$STAGE/lib/systemd/system" "$STAGE/etc/sudoers.d" "$STAGE/usr/bin" "$ROOT/dist"
+mkdir -p "$STAGE/DEBIAN" "$STAGE/opt/turret-web/static" "$STAGE/lib/systemd/system" "$STAGE/etc/default" "$STAGE/etc/sudoers.d" "$STAGE/usr/bin" "$ROOT/dist"
 cp "$ROOT/backend/server.py" "$STAGE/opt/turret-web/server.py"
 printf '{"build_date":"%s"}\n' "$BUILD_DATE" > "$STAGE/opt/turret-web/build-info.json"
 mkdir -p "$STAGE/opt/turret-web/adapters"
@@ -17,8 +17,10 @@ cp "$ROOT/packaging/turret-web-ros-check" "$STAGE/usr/bin/turret-web-ros-check"
 chmod 0755 "$STAGE/usr/bin/turret-web-ros-check"
 cp -a "$ROOT/frontend/dist/." "$STAGE/opt/turret-web/static/"
 cp "$ROOT/packaging/turret-web.service" "$STAGE/lib/systemd/system/"
+cp "$ROOT/packaging/turret-web.default" "$STAGE/etc/default/turret-web"
 cp "$ROOT/packaging/turret-web.sudoers" "$STAGE/etc/sudoers.d/turret-web"
 chmod 0440 "$STAGE/etc/sudoers.d/turret-web"
+printf '/etc/default/turret-web\n' > "$STAGE/DEBIAN/conffiles"
 cat > "$STAGE/DEBIAN/control" <<EOF
 Package: turret-web
 Version: $VERSION

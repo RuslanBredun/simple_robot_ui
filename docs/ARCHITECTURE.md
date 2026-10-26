@@ -9,9 +9,11 @@ device.
 Basic uses QA commands (`turret-info`, `turret-status`, and `turret-logs`) and
 separately confirmed Start/Stop/Restart actions for the fixed `turret.service`
 unit. It does not invoke a shell or accept arbitrary command names. Service
-action APIs require a loopback Host and an allowlisted same-origin request;
-sudoers grants only the three fixed systemctl actions. Mock mode cannot control
-the host service. The server listens on `127.0.0.1` only.
+action APIs require an allowed Host and same-origin request; sudoers grants
+only the three fixed systemctl actions. Mock mode cannot control the host
+service. The default listener is `127.0.0.1:8080`; `/etc/default/turret-web`
+configures its bind address, port, allowed Host names, and mode. LAN exposure is
+opt-in and has no authentication, so it must be restricted to a trusted network.
 
 `turret-info` supplies product and software version fields. The Info page
 shows only product identifiers and the requested application/firmware versions;

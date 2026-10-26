@@ -34,11 +34,12 @@ read-only four-page React UI with a Python standard-library backend.
 - **Control** — live, read-only turret/weapon/connection status from ROS diagnostics, alongside local camera/profile selectors, normalized joystick preview, Enable/Slow toggles, and tool/mode selectors. Homing, fuse, and activation actions are disabled. No ROS commands, control-source registration, tool activation, or live video are connected.
 - **Settings** — unavailable.
 
-The server listens on **127.0.0.1:8080 only**. Service actions are available
-only in the Overview tab, require confirmation, and are allowlisted to
-`turret.service`. They are disabled in Mock Mode. No Wi-Fi access point,
-network-facing access, or authentication is included. Do not expose it directly
-to untrusted networks.
+The server defaults to **127.0.0.1:8080**. On-device listener settings can be
+changed in `/etc/default/turret-web` without reinstalling the package; direct
+LAN access requires configuring both the bind address and allowed host list.
+Service actions are available only in the Overview tab, require confirmation,
+and are allowlisted to `turret.service`. They are disabled in Mock Mode. No
+authentication is included; do not expose the service to untrusted networks.
 
 ## Installation (offline on Raspberry Pi / Ubuntu)
 
@@ -53,8 +54,8 @@ to untrusted networks.
    sudo systemctl status turret-web.service
    ```
 
-4. On the Pi visit `http://127.0.0.1:8080`; from a workstation, temporarily
-   tunnel with `ssh -L 8080:127.0.0.1:8080 ubuntu@PI_IP`.
+4. On the Pi visit `http://127.0.0.1:8080`. To configure LAN access, see
+   [docs/INSTALL.md](docs/INSTALL.md).
 
 The separate `turret-web.service` runs regardless of whether
 `turret.service` is running. The robot runtime must install

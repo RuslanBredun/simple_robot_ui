@@ -22,12 +22,34 @@ journalctl -u turret-web.service -n 50 --no-pager
 curl http://127.0.0.1:8080/api/status
 ```
 
-Access on the Pi with a browser at `http://127.0.0.1:8080` or from a
-workstation with an SSH tunnel:
+By default the service listens only on the Pi at `http://127.0.0.1:8080`.
+To configure its network listener without reinstalling, edit
+`/etc/default/turret-web`:
 
 ```bash
-ssh -L 8080:127.0.0.1:8080 ubuntu@PI_IP
+sudoedit /etc/default/turret-web
 ```
+
+Example for direct access from a trusted LAN:
+
+```bash
+TURRET_WEB_HOST=0.0.0.0
+TURRET_WEB_PORT=8080
+TURRET_WEB_ALLOWED_HOSTS=192.168.88.56
+TURRET_WEB_MODE=real
+```
+
+`TURRET_WEB_HOST` is the bind address; use `0.0.0.0` for all interfaces or a
+specific Pi interface address. `TURRET_WEB_ALLOWED_HOSTS` is a comma-separated
+list of hostnames/IP addresses clients may use in the URL; it does not include
+the port. Both the listener and allowlist must permit LAN access. `TURRET_WEB_MODE`
+is `real` or `mock`. Keep `real` for the installed device.
+
+Apply changes with `sudo systemctl restart turret-web.service`, then open
+`http://192.168.88.56:8080` from the workstation. If a previous systemd
+override sets these `TURRET_WEB_*` variables, remove those entries so
+`/etc/default/turret-web` is the single source of truth. Restrict the port to
+a trusted network; the UI has no login.
 
 The UI reads the latest 100 logs; status and logs refresh every 5 seconds.
 ROS telemetry is sampled at 5 Hz. For live ROS data, `ROS_DISTRO` must be set
