@@ -51,16 +51,18 @@ function App() {
         <div><div className="eyebrow">КОНСОЛЬ ОБСЛУГОВУВАННЯ</div><h1>{pageLabels[page]}</h1></div>
         <div className="meta">Basic · лише читання</div>
       </header>
-      {mock && <div className="mock-banner" role="status">РЕЖИМ MOCK — синтетичні дані для розробки, не телеметрія робота</div>}
-      {healthError && <p className="error" role="alert">Помилка перевірки backend: {healthError}</p>}
-      {page === 'Info' && <InfoPage />}
-      {page === 'Diagnostics' && <DiagnosticsPage />}
-      {page === 'Control' && <ControlPage />}
-      {page === 'Settings' && <section className="panel">
-        <div className="tag">РОЗШИРЕНА ВЕРСІЯ</div>
-        <h2>{pageLabels[page]} — недоступно у Basic</h2>
-        <p>Ця сторінка недоступна в поточній версії.</p>
-      </section>}
+      <div className="page-content">
+        {mock && <div className="mock-banner" role="status">РЕЖИМ MOCK — синтетичні дані для розробки, не телеметрія робота</div>}
+        {healthError && <p className="error" role="alert">Помилка перевірки backend: {healthError}</p>}
+        {page === 'Info' && <InfoPage />}
+        {page === 'Diagnostics' && <DiagnosticsPage />}
+        {page === 'Control' && <ControlPage />}
+        {page === 'Settings' && <section className="panel">
+          <div className="tag">РОЗШИРЕНА ВЕРСІЯ</div>
+          <h2>{pageLabels[page]} — недоступно у Basic</h2>
+          <p>Ця сторінка недоступна в поточній версії.</p>
+        </section>}
+      </div>
     </main>
   </div>;
 }

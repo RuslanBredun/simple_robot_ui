@@ -6,11 +6,12 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; }
+html, body, #root { width: 100%; height: 100%; }
+body { margin: 0; overflow: hidden; }
 button, a { font: inherit; }
 button { cursor: pointer; }
 button:disabled { opacity: .45; cursor: not-allowed; }
-.shell { min-height: 100vh; display: flex; }
+.shell { height: 100vh; height: 100dvh; display: flex; overflow: hidden; }
 .nav {
   width: 245px;
   flex: 0 0 245px;
@@ -19,6 +20,8 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   padding: 28px 18px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
 }
 .brand { font-size: 24px; font-weight: 800; letter-spacing: .11em; }
 .brand span { color: #55a2fb; }
@@ -35,14 +38,31 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .nav nav button.selected { background: #193054; border-color: #345a91; color: #fff; }
 .nav small { float: right; color: #7e94b6; font-size: 10px; }
 .bottom { margin-top: auto; font-size: 12px; color: #8194af; }
-main { flex: 1; padding: 36px; max-width: 1280px; min-width: 0; }
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 28px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
 header, .line { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-header { margin-bottom: 24px; }
+header { flex: 0 0 auto; margin-bottom: 20px; }
+.page-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 0 2px 2px 0;
+}
 h1 { font-size: 32px; margin: 4px 0; }
 h2 { font-size: 20px; margin: 6px 0 12px; }
 .eyebrow, .tag { font-size: 11px; letter-spacing: .16em; font-weight: 650; color: #73aaf4; }
 .meta { color: #acbad0; font-size: 13px; }
-.panel { background: #101c2f; border: 1px solid #263754; border-radius: 14px; padding: 26px; margin-bottom: 17px; }
+.panel { background: #101c2f; border: 1px solid #263754; border-radius: 14px; padding: 26px; margin: 0; }
 p { line-height: 1.6; color: #b6c3d5; }
 .muted { color: #8093b0; font-size: 13px; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -148,8 +168,15 @@ p { line-height: 1.6; color: #b6c3d5; }
   padding: 12px 18px;
 }
 .tab-button.active { color: #fff; border-bottom-color: #55a2fb; }
-.info-panel, .diagnostics-panel { min-width: 0; }
+.info-panel, .diagnostics-panel, .control-panel {
+  min-width: 0;
+  min-height: 100%;
+}
+.page-content > .panel { min-height: 100%; }
+.info-panel, .diagnostics-panel, .control-panel { padding: clamp(16px, 2.2vw, 26px); }
+.info-panel, .diagnostics-panel, .control-panel { display: flex; flex-direction: column; }
 .info-panel h2, .diagnostics-panel h2 { margin-bottom: 0; }
+.info-panel .info-groups { flex: 1 0 auto; }
 .info-groups { display: grid; gap: 18px; }
 .info-group h3 { font-size: 15px; margin: 20px 0 10px; color: #dbe6f5; }
 .info-group .cards { margin: 0; }
@@ -238,7 +265,9 @@ p { line-height: 1.6; color: #b6c3d5; }
   overflow-wrap: anywhere;
 }
 .logs {
-  height: 300px;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 220px;
   overflow: auto;
   margin: 0;
   padding: 18px;
@@ -268,14 +297,15 @@ p { line-height: 1.6; color: #b6c3d5; }
   .diagnostics-actions { width: 100%; }
   .diagnostics-subheader { flex-wrap: wrap; }
   .diagnostics-subheader-actions { margin-left: auto; }
-  .shell { display: block; }
-  .nav { width: 100%; padding: 16px; }
+  .shell { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+  .nav { width: 100%; padding: 14px 16px; }
   .nav nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .nav nav button { padding: 10px; font-size: 12px; }
   .nav small { display: none; }
   .bottom { display: none; }
-  main { padding: 18px; }
+  main { width: 100%; padding: 18px; }
   header, .toolbar { align-items: flex-start; flex-direction: column; }
+  header { gap: 4px; margin-bottom: 14px; }
   .cards { grid-template-columns: 1fr; }
   .line { align-items: flex-start; }
   .info-panel .panel-heading { flex-wrap: wrap; }
@@ -286,7 +316,7 @@ p { line-height: 1.6; color: #b6c3d5; }
   .tab-button { padding: 11px 13px; font-size: 13px; }
   .info-panel .tab-strip .tab-button { padding: 6px 8px; }
   .download { padding: 9px 12px; font-size: 12px; }
-  .logs { height: 270px; }
+  .logs { min-height: 180px; }
 }
 
 @media (max-width: 480px) {
@@ -316,7 +346,15 @@ p { line-height: 1.6; color: #b6c3d5; }
 
 /* v0.5 Control mock preview — no device commands or live video */
 .control-panel h3 { font-size: 16px; margin: 0 0 14px; }
-.control-workspace { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "status" "video" "panels"; gap: 16px; align-items: stretch; }
+.control-workspace {
+  flex: 1 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, .7fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "status status" "video panels";
+  gap: 16px;
+  align-items: stretch;
+}
 .control-status-panel { grid-area: status; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .control-status-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; min-height: 48px; padding: 8px 12px; border: 1px solid #293a56; border-radius: 9px; background: #0c1627; }
 .control-status-card span { color: #9eafc8; font-size: 12px; }
@@ -352,7 +390,21 @@ p { line-height: 1.6; color: #b6c3d5; }
 .control-motion-buttons { grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: center; }
 .control-motion-panel .control-motion-buttons { margin: auto 0; }
 .control-motion-buttons button { width: 100%; }
+@media (max-width: 1024px) {
+  .control-workspace {
+    flex: 0 0 auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    grid-template-areas: "status" "video" "panels";
+  }
+}
 @media (max-width: 800px) {
+  .control-workspace {
+    flex: 0 0 auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    grid-template-areas: "status" "video" "panels";
+  }
   .control-panels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .control-stick-preview { width: min(200px, 100%); }
   .control-video-placeholder { aspect-ratio: 16/9; min-height: 220px; }
