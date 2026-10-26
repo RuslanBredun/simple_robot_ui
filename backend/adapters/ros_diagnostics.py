@@ -1,6 +1,7 @@
 """Read-only ROS 2 topic adapter with an explicit unavailable state."""
 import os
 import random
+import sys
 import threading
 import time
 from datetime import datetime, timezone
@@ -98,10 +99,13 @@ class RosDiagnosticsAdapter:
 
     def stop(self):
         self._stop.set()
-        if self._rclpy is not None and self._rclpy.ok():
-            self._rclpy.shutdown()
         if self._thread is not None:
             self._thread.join(timeout=2)
+            if self._thread.is_alive():
+                print(
+                    "[WARN] ROS diagnostics thread did not stop within 2 seconds",
+                    file=sys.stderr,
+                )
 
     def _spin(self):
         try:

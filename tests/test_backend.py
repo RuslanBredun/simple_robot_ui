@@ -87,6 +87,34 @@ class QaCliTests(unittest.TestCase):
 
 
 class RosDiagnosticsTests(unittest.TestCase):
+    def test_stop_waits_for_ros_thread_without_shutting_down_context_concurrently(self):
+        adapter = RosDiagnosticsAdapter()
+        calls = []
+
+        class Thread:
+            def join(self, timeout):
+                calls.append(("join", timeout))
+
+            def is_alive(self):
+                return False
+
+        class Rclpy:
+            @staticmethod
+            def ok():
+                return True
+
+            @staticmethod
+            def shutdown():
+                self.fail("shutdown must be performed by the ROS thread")
+
+        adapter._thread = Thread()
+        adapter._rclpy = Rclpy()
+
+        adapter.stop()
+
+        self.assertTrue(adapter._stop.is_set())
+        self.assertEqual(calls, [("join", 2)])
+
     def test_motor_and_joint_samples_are_exposed(self):
         adapter = RosDiagnosticsAdapter()
 
