@@ -36,6 +36,7 @@ The default values are:
 TURRET_WEB_HOST=0.0.0.0
 TURRET_WEB_PORT=8080
 TURRET_WEB_ALLOWED_HOSTS=192.168.88.56
+TURRET_WEB_ALLOWED_ORIGINS=
 TURRET_WEB_MODE=real
 TURRET_WEB_FASTDDS_BUILTIN_TRANSPORTS=UDPv4
 ```
@@ -49,11 +50,20 @@ is `real` or `mock`. Keep `real` for the installed device.
 process only; `UDPv4` avoids shared-memory transport permission issues when
 the service runs under a different Linux user than the robot runtime.
 
+For an HTTPS reverse proxy, add each externally visible origin exactly, without
+a trailing slash, and trust forwarding headers only when the backend is not
+directly reachable by clients:
+
+```bash
+TURRET_WEB_ALLOWED_ORIGINS=https://robot.example
+TURRET_WEB_TRUST_PROXY=1
+```
+
 Apply changes with `sudo systemctl restart turret-web.service`, then open
 `http://192.168.88.56:8080` from the workstation. If a previous systemd
 override sets these `TURRET_WEB_*` variables, remove those entries so
 `/etc/default/turret-web` is the single source of truth. Restrict the port to
-a trusted network; the UI has no login.
+a trusted network; password login does not encrypt HTTP traffic.
 
 The UI reads the latest 100 logs; status and logs refresh every 5 seconds.
 ROS telemetry is sampled at 5 Hz. For live ROS data, `ROS_DISTRO` and the
@@ -131,7 +141,7 @@ not manufacturer-specified limits.
   the fixed Start/Stop/Restart commands for `turret.service` and inspect
   `journalctl -u turret-web.service`.
 
-No factory AP setup, login, or TLS yet.
+No factory AP setup or built-in TLS termination exists yet.
 
 ## Control prototype
 

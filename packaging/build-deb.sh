@@ -55,6 +55,11 @@ Template: turret-web/password-mismatch
 Type: error
 Description: Robot Web UI passwords do not match
  The password and confirmation must be identical. Please try again.
+
+Template: turret-web/password-too-short
+Type: error
+Description: Robot Web UI password is too short
+ Use at least 12 characters, or leave both fields blank to generate a password.
 EOF
 cat > "$STAGE/DEBIAN/config" <<'EOF'
 #!/bin/sh
@@ -69,10 +74,16 @@ if [ ! -f /var/lib/turret-web/auth.json ]; then
         password="$RET"
         db_get turret-web/password-confirm
         confirmation="$RET"
-        if [ "$password" = "$confirmation" ]; then
+        if [ -z "$password" ] && [ -z "$confirmation" ]; then
             break
         fi
-        db_input critical turret-web/password-mismatch || true
+        if [ "$password" != "$confirmation" ]; then
+            db_input critical turret-web/password-mismatch || true
+        elif [ "${#password}" -lt 12 ]; then
+            db_input critical turret-web/password-too-short || true
+        else
+            break
+        fi
         db_go || true
         db_reset turret-web/password
         db_reset turret-web/password-confirm
@@ -104,7 +115,8 @@ db_reset turret-web/password || true
 db_reset turret-web/password-confirm || true
 if command -v systemctl >/dev/null && [ -d /run/systemd/system ]; then
     systemctl daemon-reload
-    systemctl enable --now turret-web.service
+    systemctl enable turret-web.service
+    systemctl restart turret-web.service
 fi
 EOF
 cat > "$STAGE/DEBIAN/prerm" <<'EOF'

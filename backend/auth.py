@@ -12,6 +12,9 @@ from pathlib import Path
 AUTH_FILE = Path(os.environ.get("TURRET_WEB_AUTH_FILE", "/var/lib/turret-web/auth.json"))
 ITERATIONS = 600_000
 SESSION_SECONDS = 12 * 60 * 60
+FAILURE_WINDOW_SECONDS = 5 * 60
+MAX_SESSIONS = 1024
+MAX_FAILURE_CLIENTS = 4096
 COOKIE_NAME = "turret_web_session"
 
 def password_record(password):
@@ -40,6 +43,25 @@ class AuthManager:
         self.sessions = {}
         self.failures = {}
 
+    def _prune(self, now):
+        self.sessions = {token: expiry for token, expiry in self.sessions.items()
+                         if expiry > now}
+        if len(self.sessions) > MAX_SESSIONS:
+            newest = sorted(self.sessions.items(), key=lambda item: item[1],
+                            reverse=True)[:MAX_SESSIONS]
+            self.sessions = dict(newest)
+        active_failures = {}
+        for address, attempts in self.failures.items():
+            recent = [timestamp for timestamp in attempts
+                      if now - timestamp < FAILURE_WINDOW_SECONDS]
+            if recent:
+                active_failures[address] = recent
+        if len(active_failures) > MAX_FAILURE_CLIENTS:
+            newest = sorted(active_failures.items(), key=lambda item: item[1][-1],
+                            reverse=True)[:MAX_FAILURE_CLIENTS]
+            active_failures = dict(newest)
+        self.failures = active_failures
+
     def _record(self):
         try:
             return json.loads(self.path.read_text(encoding="utf-8"))
@@ -52,7 +74,8 @@ class AuthManager:
     def login(self, password, address):
         with self.lock:
             now = time.monotonic()
-            attempts = [t for t in self.failures.get(address, []) if now - t < 300]
+            self._prune(now)
+            attempts = self.failures.get(address, [])
             if len(attempts) >= 5:
                 self.failures[address] = attempts
                 return None, "Too many attempts; retry later"
@@ -62,6 +85,9 @@ class AuthManager:
                 self.failures[address] = attempts
                 return None, "Invalid credentials"
             self.failures.pop(address, None)
+            while len(self.sessions) >= MAX_SESSIONS:
+                oldest = min(self.sessions, key=self.sessions.get)
+                self.sessions.pop(oldest, None)
             token = secrets.token_urlsafe(32)
             self.sessions[token] = now + SESSION_SECONDS
             return token, None
@@ -74,11 +100,9 @@ class AuthManager:
         except (KeyError, ValueError):
             return False
         with self.lock:
+            self._prune(time.monotonic())
             expiry = self.sessions.get(token)
             if expiry is None:
-                return False
-            if expiry <= time.monotonic():
-                self.sessions.pop(token, None)
                 return False
             return True
 

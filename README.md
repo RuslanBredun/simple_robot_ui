@@ -38,8 +38,9 @@ The packaged defaults listen on **0.0.0.0:8080** and allow the host
 `192.168.88.56`. On-device listener settings can be changed in
 `/etc/default/turret-web` without reinstalling the package.
 Service actions are available only in the Overview tab, require confirmation,
-and are allowlisted to `turret.service`. They are disabled in Mock Mode. No
-authentication is included; do not expose the service to untrusted networks.
+and are allowlisted to `turret.service`. They are disabled in Mock Mode. Password
+authentication protects the API, but HTTP is not encrypted; do not expose the
+service to untrusted networks.
 
 ## Installation (offline on Raspberry Pi / Ubuntu)
 
@@ -116,8 +117,9 @@ build, and packages static files, backend, and systemd into an
 
 ## Future
 
-Firmware inventory, richer ROS diagnostics, Extended Settings/Control,
-authentication, and Factory AP / Field Ethernet access policy.
+Firmware inventory, richer ROS diagnostics, Extended Settings/Control, and
+Factory AP / Field Ethernet access policy. See
+[development roadmap](docs/ROADMAP.md) for the proposed delivery sequence.
 
 See [architecture](docs/ARCHITECTURE.md) and [installation](docs/INSTALL.md).
 

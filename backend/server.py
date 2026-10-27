@@ -31,11 +31,24 @@ def allowed_hosts():
 
 
 def allowed_origins():
-    return {
+    origins = {
         *(f"http://{host}" for host in allowed_hosts()),
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     }
+    origins.update(origin.strip().rstrip("/") for origin in
+                   os.environ.get("TURRET_WEB_ALLOWED_ORIGINS", "").split(",")
+                   if origin.strip())
+    return origins
+
+
+def allowed_request_hosts():
+    hosts = set(allowed_hosts())
+    for origin in allowed_origins():
+        parsed = urlparse(origin)
+        if parsed.scheme in {"http", "https"} and parsed.netloc:
+            hosts.add(parsed.netloc)
+    return hosts
 
 
 def web_ui_build_info():
@@ -90,7 +103,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.headers.get("X-Forwarded-Proto") == "https" and os.environ.get("TURRET_WEB_TRUST_PROXY") == "1"
 
     def valid_host(self):
-        return self.headers.get("Host") in allowed_hosts()
+        return self.headers.get("Host") in allowed_request_hosts()
 
     def respond(self, code, payload, headers=None):
         data = json.dumps(payload).encode("utf-8")

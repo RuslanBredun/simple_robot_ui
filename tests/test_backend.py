@@ -386,6 +386,15 @@ class HttpApiTests(unittest.TestCase):
                 server.allowed_origins(),
             )
 
+    def test_https_proxy_origin_and_host_are_explicitly_allowlisted(self):
+        environment = {
+            "TURRET_WEB_ALLOWED_HOSTS": "192.168.88.56",
+            "TURRET_WEB_ALLOWED_ORIGINS": "https://robot.example",
+        }
+        with patch.dict("os.environ", environment, clear=False):
+            self.assertIn("https://robot.example", server.allowed_origins())
+            self.assertIn("robot.example", server.allowed_request_hosts())
+
     def test_web_ui_build_date_is_loaded_from_packaged_metadata(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -533,6 +542,26 @@ class AuthenticationTests(unittest.TestCase):
                 self.assertEqual(manager.login("bad", "test-client")[0], None)
             self.assertEqual(manager.login("correct", "test-client")[1],
                              "Too many attempts; retry later")
+
+    def test_auth_state_is_pruned_and_bounded(self):
+        from auth import AuthManager, MAX_FAILURE_CLIENTS, MAX_SESSIONS, password_record
+        with tempfile.TemporaryDirectory() as directory:
+            file = Path(directory) / "auth.json"
+            file.write_text(json.dumps(password_record("correct")), encoding="utf-8")
+            manager = AuthManager(file)
+            manager.sessions = {
+                f"active-{index}": float("inf") for index in range(MAX_SESSIONS + 10)
+            }
+            manager.sessions.update({f"expired-{index}": 0 for index in range(20)})
+            manager.failures = {
+                f"expired-{index}": [0] for index in range(MAX_FAILURE_CLIENTS + 10)
+            }
+            token, error = manager.login("correct", "test-client")
+            self.assertIsNone(error)
+            self.assertIsNotNone(token)
+            self.assertLessEqual(len(manager.sessions), MAX_SESSIONS)
+            self.assertLessEqual(len(manager.failures), MAX_FAILURE_CLIENTS)
+            self.assertFalse(any(token.startswith("expired-") for token in manager.sessions))
 
     def test_http_authentication_flow(self):
         from auth import AuthManager, password_record

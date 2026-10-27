@@ -12,8 +12,9 @@ unit. It does not invoke a shell or accept arbitrary command names. Service
 action APIs require an allowed Host and same-origin request; sudoers grants
 only the three fixed systemctl actions. Mock mode cannot control the host
 service. The default listener is `127.0.0.1:8080`; `/etc/default/turret-web`
-configures its bind address, port, allowed Host names, and mode. LAN exposure is
-opt-in and has no authentication, so it must be restricted to a trusted network.
+configures its bind address, port, allowed Host names/origins, and mode. LAN
+exposure uses password authentication but remains restricted to a trusted
+network because plain HTTP does not provide confidentiality.
 
 `turret-info` supplies product and software version fields. The Info page
 shows only product identifiers and the requested application/firmware versions;
@@ -70,10 +71,9 @@ thresholds, not manufacturer-specified limits. Position/velocity charts are
 hidden for S360 because the workspace does not confirm an equivalent data
 source and units for that model.
 
-**Important:** authentication is not implemented. The service binds only to
-loopback and must not be exposed to the device LAN or factory AP without an
-explicit authentication/authorization and CSRF security redesign. SSH tunnel
-is temporary.
+**Important:** password authentication is implemented, but authorization roles,
+built-in TLS, and a Factory/Field network policy are not. Do not expose the
+service to an untrusted LAN or factory AP. SSH tunnelling is temporary.
 
 Future milestones: firmware inventory, richer ROS diagnostics, safe
 configuration editing, Extended operator control, and Factory/Field AP access
