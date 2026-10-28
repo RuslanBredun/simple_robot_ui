@@ -11,7 +11,7 @@ from pathlib import Path
 
 AUTH_FILE = Path(os.environ.get("TURRET_WEB_AUTH_FILE", "/var/lib/turret-web/auth.json"))
 ITERATIONS = 600_000
-SESSION_SECONDS = 12 * 60 * 60
+SESSION_SECONDS = 60 * 60
 FAILURE_WINDOW_SECONDS = 5 * 60
 MAX_SESSIONS = 1024
 MAX_FAILURE_CLIENTS = 4096
@@ -105,6 +105,21 @@ class AuthManager:
             if expiry is None:
                 return False
             return True
+
+    def touch(self, cookie_header):
+        cookie = SimpleCookie()
+        try:
+            cookie.load(cookie_header or "")
+            token = cookie[COOKIE_NAME].value
+        except (KeyError, ValueError):
+            return None
+        with self.lock:
+            now = time.monotonic()
+            self._prune(now)
+            if token not in self.sessions:
+                return None
+            self.sessions[token] = now + SESSION_SECONDS
+            return token
 
     def logout(self, cookie_header):
         cookie = SimpleCookie()

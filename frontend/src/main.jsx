@@ -29,6 +29,25 @@ function App() {
     return () => { active = false; window.removeEventListener('turret-auth-expired', expired); };
   }, []);
 
+  useEffect(() => {
+    if (auth !== 'yes') return;
+    let lastSent = 0;
+    const onActivity = () => {
+      const now = Date.now();
+      if (now - lastSent < 60_000 || document.visibilityState !== 'visible') return;
+      lastSent = now;
+      api('auth/activity', { method: 'POST' }).catch(() => {});
+    };
+    for (const event of ['pointerdown', 'keydown', 'wheel', 'touchstart']) {
+      window.addEventListener(event, onActivity, { passive: true });
+    }
+    return () => {
+      for (const event of ['pointerdown', 'keydown', 'wheel', 'touchstart']) {
+        window.removeEventListener(event, onActivity);
+      }
+    };
+  }, [auth]);
+
   async function logout() {
     try { await api('auth/logout', { method: 'POST' }); } finally { setAuth('no'); }
   }

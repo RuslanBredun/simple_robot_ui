@@ -209,6 +209,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(429 if error.startswith("Too many") else 401, {"error": error})
             return self.respond(200, {"authenticated": True}, {
                 "Set-Cookie": session_cookie(token, secure=self.secure_cookie())})
+        if path == "/api/auth/activity":
+            token = self.auth.touch(self.headers.get("Cookie"))
+            if token is None:
+                return self.respond(401, {"error": "Authentication required"})
+            return self.respond(200, {"authenticated": True}, {
+                "Set-Cookie": session_cookie(token, secure=self.secure_cookie())})
         if not self.is_authenticated():
             return self.respond(401, {"error": "Authentication required"})
         if path == "/api/auth/logout":
