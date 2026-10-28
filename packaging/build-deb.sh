@@ -78,7 +78,7 @@ if [ ! -f /var/lib/turret-web/auth.json ]; then
     db_get turret-web/password-mode
     mode="$RET"
     # No interactive terminal: never install the shared factory password.
-    if [ ! -t 0 ]; then
+    if [ "${DEBIAN_FRONTEND:-}" = "noninteractive" ]; then
         mode="Generate random password"
     fi
     if [ "$mode" = "Custom password" ]; then
@@ -118,7 +118,7 @@ fi
 if [ ! -f /var/lib/turret-web/auth.json ]; then
     db_get turret-web/password-mode
     mode="$RET"
-    if [ ! -t 0 ]; then
+    if [ "${DEBIAN_FRONTEND:-}" = "noninteractive" ]; then
         mode="Generate random password"
     fi
     case "$mode" in
