@@ -155,3 +155,7 @@ sudo systemctl restart turret-web.service
 ```
 
 The command does not echo passwords, does not require reinstalling the package, and does not change existing credentials if confirmation fails. `set-stdin` remains available for automation; `rotate` generates a random password.
+
+### Factory password policy
+
+On a first interactive installation choose a custom password (minimum 8 characters), the shared factory password `service1`, or a generated random password. The shared password is for isolated factory provisioning only; change it before field deployment. Unattended installation generates a random password, and upgrades preserve existing credentials. Password-only login does not require a user database. Use `sudo turret-web-set-password` to change the password interactively.

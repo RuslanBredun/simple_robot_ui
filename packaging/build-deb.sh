@@ -38,18 +38,25 @@ Depends: python3, systemd, sudo, adduser, debconf, rob-app
 Description: Local maintenance interface for turret.service
 EOF
 cat > "$STAGE/DEBIAN/templates" <<'EOF'
+Template: turret-web/password-mode
+Type: select
+Choices: Custom password, Factory default (service1), Generate random password
+Default: Custom password
+Description: Choose initial Robot Web UI password:
+ The factory default service1 is shared across devices and must only be used
+ during trusted factory provisioning. Change it before field deployment.
+ .
+ Unattended installations use a unique random password.
+
 Template: turret-web/password
 Type: password
 Description: Password for Robot Web UI:
- Enter a password for the local maintenance interface.
- Leave blank to generate a unique random password (for unattended installs).
- .
- Existing passwords are preserved when upgrading.
+ Enter a new password with at least 8 characters.
 
 Template: turret-web/password-confirm
 Type: password
 Description: Confirm Robot Web UI password:
- Re-enter the password. Leave blank if generating a random password.
+ Re-enter the custom password.
 
 Template: turret-web/password-mismatch
 Type: error
@@ -59,35 +66,42 @@ Description: Robot Web UI passwords do not match
 Template: turret-web/password-too-short
 Type: error
 Description: Robot Web UI password is too short
- Use at least 12 characters, or leave both fields blank to generate a password.
+ Use at least 8 characters.
 EOF
 cat > "$STAGE/DEBIAN/config" <<'EOF'
 #!/bin/sh
 set -e
 . /usr/share/debconf/confmodule
 if [ ! -f /var/lib/turret-web/auth.json ]; then
-    while :; do
-        db_input high turret-web/password || true
-        db_input high turret-web/password-confirm || true
-        db_go || true
-        db_get turret-web/password
-        password="$RET"
-        db_get turret-web/password-confirm
-        confirmation="$RET"
-        if [ -z "$password" ] && [ -z "$confirmation" ]; then
-            break
-        fi
-        if [ "$password" != "$confirmation" ]; then
-            db_input critical turret-web/password-mismatch || true
-        elif [ "${#password}" -lt 12 ]; then
-            db_input critical turret-web/password-too-short || true
-        else
-            break
-        fi
-        db_go || true
-        db_reset turret-web/password
-        db_reset turret-web/password-confirm
-    done
+    db_input high turret-web/password-mode || true
+    db_go || true
+    db_get turret-web/password-mode
+    mode="$RET"
+    # No interactive terminal: never install the shared factory password.
+    if [ ! -t 0 ]; then
+        mode="Generate random password"
+    fi
+    if [ "$mode" = "Custom password" ]; then
+        while :; do
+            db_input high turret-web/password || true
+            db_input high turret-web/password-confirm || true
+            db_go || true
+            db_get turret-web/password
+            password="$RET"
+            db_get turret-web/password-confirm
+            confirmation="$RET"
+            if [ "$password" != "$confirmation" ]; then
+                db_input critical turret-web/password-mismatch || true
+            elif [ "${#password}" -lt 8 ]; then
+                db_input critical turret-web/password-too-short || true
+            else
+                break
+            fi
+            db_go || true
+            db_reset turret-web/password
+            db_reset turret-web/password-confirm
+        done
+    fi
 fi
 exit 0
 EOF
@@ -102,15 +116,28 @@ if getent group systemd-journal >/dev/null; then
     usermod -aG systemd-journal turret-web
 fi
 if [ ! -f /var/lib/turret-web/auth.json ]; then
-    db_get turret-web/password
-    password="$RET"
-    if [ -n "$password" ]; then
-        printf '%s\n' "$password" | /usr/bin/python3 /usr/bin/turret-web-set-password set-stdin
-    else
-        /usr/bin/python3 /usr/bin/turret-web-set-password init
+    db_get turret-web/password-mode
+    mode="$RET"
+    if [ ! -t 0 ]; then
+        mode="Generate random password"
     fi
-    unset password
+    case "$mode" in
+        "Factory default (service1)")
+            /usr/bin/python3 /usr/bin/turret-web-set-password factory-default ;;
+        "Custom password")
+            db_get turret-web/password
+            password="$RET"
+            if [ "${#password}" -lt 8 ]; then
+                echo "Custom password missing or too short" >&2
+                exit 1
+            fi
+            printf '%s\n' "$password" | /usr/bin/python3 /usr/bin/turret-web-set-password set-stdin
+            unset password ;;
+        *)
+            /usr/bin/python3 /usr/bin/turret-web-set-password init ;;
+    esac
 fi
+db_reset turret-web/password-mode || true
 db_reset turret-web/password || true
 db_reset turret-web/password-confirm || true
 if command -v systemctl >/dev/null && [ -d /run/systemd/system ]; then

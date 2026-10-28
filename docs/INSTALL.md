@@ -189,3 +189,7 @@ First interactive `apt install ./turret-web_*.deb` asks for a password and confi
 CI packages are versioned `0.5.1+ci.<GITHUB_RUN_NUMBER>`. Check with `dpkg-deb -f ./turret-web_*.deb Version` and compare with `dpkg-query -W -f='${Version}\\n' turret-web`. Install the newer artifact using `sudo apt install ./turret-web_0.5.1+ci.N_all.deb` without removing the old package. The version must increase for an upgrade; GitHub reruns of the same workflow run reuse the same run number.
 
 To set a new password interactively at any time, run `sudo turret-web-set-password`. It prompts twice with hidden input, requires at least 12 characters, and leaves the old password intact on mismatch. Restart `turret-web.service` afterward to invalidate existing sessions. `set-stdin` remains supported for scripts.
+
+### Factory default option
+
+On a new interactive install, choose custom password (minimum 8 characters), factory default `service1`, or a unique generated password. The shared factory password must be replaced before field deployment. Noninteractive installations generate a unique random password, not the shared factory password. Existing credentials are preserved during upgrades.
