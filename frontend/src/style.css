@@ -433,3 +433,8 @@ p { line-height: 1.6; color: #b6c3d5; }
 .battery-warning .battery-fill { background:#f2c057; }
 .battery-error .battery-fill { background:#f07378; }
 .battery-unknown .battery-fill { background:#6c7e96; }
+
+/* Equal-height current-state cards, with freshness aligned at the bottom. */
+.overview-group:has(> h3:first-child) .status-grid > .status-card { min-height: 125px; }
+.status-card { display:flex; flex-direction:column; }
+.status-card > .freshness { margin-top:auto; padding-top:9px; }

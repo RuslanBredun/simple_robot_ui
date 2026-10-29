@@ -101,9 +101,25 @@ function statusTone(value, fresh) {
   return 'neutral';
 }
 
-function StatusIcon({ kind, tone = 'neutral' }) {
-  const symbols = { turret: '◎', turretOperation: '↻', weapon: '◈', weaponOperation: '⚙', battery: '▣' };
-  return <span className={`status-icon status-icon-${tone}`} aria-hidden="true">{symbols[kind] || '●'}</span>;
+const stateIcons = {
+  UNKNOWN: '？', IDLE: '◷', BOOTING: '↻', CONFIGURING: '⚙',
+  READY: '✓', FAULT: '✕', ERROR: '✕', FAILED: '✕',
+  STOPPED: '■', DISABLED: '○', HOLD: '▣', MANUAL: '✥',
+  POINTING: '⊕', PROCEDURE: '⚙', UNARMED: '◇', ARMING: '↗',
+  ARMED: '◆', FIRING: '✦', FIRING_ROUND_COMPLETE: '✓',
+  SERVICE: '⚒', NONE: '—', HOMING: '⌖', RECHARGING: '↻',
+  CALIBRATING: '⚒', RUNNING: '↻', PAUSED: 'Ⅱ', FINISHED: '✓',
+  COMPLETED: '✓', PRESENT: '◉', HEALTHY: '✓', DEGRADED: '!',
+};
+const stateTones = {
+  FAULT: 'error', ERROR: 'error', FAILED: 'error',
+  DEGRADED: 'warning', PAUSED: 'warning', CONFIGURING: 'warning',
+  READY: 'ok', HEALTHY: 'ok', FINISHED: 'ok', COMPLETED: 'ok',
+};
+function StatusIcon({ state, fresh }) {
+  const key = String(state || 'UNKNOWN').toUpperCase();
+  const tone = !fresh ? 'unknown' : (stateTones[key] || 'neutral');
+  return <span className={`status-icon status-icon-${tone}`} aria-hidden="true">{stateIcons[key] || '●'}</span>;
 }
 
 function BatteryIndicator({ percent, available }) {
@@ -118,11 +134,11 @@ function BatteryIndicator({ percent, available }) {
   </span>;
 }
 
-function StatusCard({ label, value, fresh, detail, icon, tone }) {
+function StatusCard({ label, value, fresh, detail, state }) {
   return <div className="status-card">
     <label>{label}</label>
     <div className="status-value-row">
-      {icon && <StatusIcon kind={icon} tone={tone || statusTone(value, fresh)} />}
+      {state !== undefined && <StatusIcon state={state} fresh={fresh} />}
       <strong>{value ?? 'Недоступно'}</strong>
     </div>
     {detail && <span className="metric-detail">{detail}</span>}
@@ -443,18 +459,17 @@ export function DiagnosticsPage() {
               <BatteryIndicator percent={batteryPercent} available={batteryPercentAvailable} />
               <strong>{batteryPercentAvailable ? `${Math.round(batteryPercent)}%` : 'Немає даних'}</strong>
             </div>
-            <span className="metric-detail">{batteryPercentAvailable ? 'Орієнтовна оцінка заряду' : 'Оцінка заряду недоступна'}</span>
             <span className={`freshness ${batteryPercentAvailable ? 'fresh' : ''}`}>{batteryPercentAvailable ? 'Актуальні дані' : 'Немає актуальних даних'}</span>
           </div>
           <StatusCard
             label="Режим турелі"
-            icon="turret"
+            state={diagnostics?.gimbal?.mode}
             value={isFresh(diagnostics?.gimbal) ? stateLabel(diagnostics.gimbal.mode) : 'Немає даних'}
             fresh={isFresh(diagnostics?.gimbal)}
           />
           <StatusCard
             label="Операція турелі"
-            icon="turretOperation"
+            state={diagnostics?.gimbal?.operation_state || diagnostics?.gimbal?.operation_type}
             value={isFresh(diagnostics?.gimbal)
               ? `${stateLabel(diagnostics.gimbal.operation_type)} · ${stateLabel(diagnostics.gimbal.operation_state)}`
               : 'Немає даних'}
@@ -462,7 +477,7 @@ export function DiagnosticsPage() {
           />
           <StatusCard
             label="Режим зброї"
-            icon="weapon"
+            state={diagnostics?.modes?.weapon?.mode}
             value={isFresh(diagnostics?.modes?.weapon)
               ? stateLabel(diagnostics.modes.weapon.mode)
               : 'Немає даних'}
@@ -470,7 +485,7 @@ export function DiagnosticsPage() {
           />
           <StatusCard
             label="Операція зброї"
-            icon="weaponOperation"
+            state={diagnostics?.modes?.weapon?.operation_state || diagnostics?.modes?.weapon?.operation_type}
             value={isFresh(diagnostics?.modes?.weapon)
               ? `${stateLabel(diagnostics.modes.weapon.operation_type)} · ${stateLabel(diagnostics.modes.weapon.operation_state)}`
               : 'Немає даних'}
