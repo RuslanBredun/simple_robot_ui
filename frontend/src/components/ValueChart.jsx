@@ -6,6 +6,16 @@ const HEIGHT = 260;
 const PLOT = { left: 68, right: 18, top: 12, bottom: 42 };
 const COLORS = ['#56a8ff', '#ffb454', '#62d3a3', '#c78cff'];
 
+function seriesColor(item) {
+  const id = String(item.key || item.name || '').toLowerCase();
+  // Axis colors are fixed regardless of discovery/order in the chart.
+  if (/(^|[^a-z])x([^a-z]|$)|yaw/.test(id)) return COLORS[0];
+  if (/(^|[^a-z])y([^a-z]|$)|pitch/.test(id)) return COLORS[1];
+  let hash = 0;
+  for (const char of id) hash = ((hash * 31) + char.charCodeAt(0)) >>> 0;
+  return COLORS[hash % COLORS.length];
+}
+
 function axisBounds(values) {
   if (!values.length) return { min: 0, max: 1 };
   let min = Math.min(...values);
@@ -112,7 +122,7 @@ export function ValueChart({
           key={item.name}
           points={coordinates}
           fill="none"
-          stroke={COLORS[index % COLORS.length]}
+          stroke={seriesColor(item)}
           strokeWidth="2"
           vectorEffect="non-scaling-stroke"
         />;
@@ -140,7 +150,7 @@ export function ValueChart({
             cx={pointX}
             cy={pointY}
             r="4"
-            fill={COLORS[index % COLORS.length]}
+            fill={seriesColor(item)}
             vectorEffect="non-scaling-stroke"
           />
           <text
@@ -148,7 +158,7 @@ export function ValueChart({
             y={labelY}
             textAnchor={pointX > WIDTH - 120 ? 'end' : 'start'}
             className="crosshair-value"
-            fill={COLORS[index % COLORS.length]}
+            fill={seriesColor(item)}
           >{cursorPoint.value.toFixed(3)}</text>
         </g>;
       })}
@@ -156,7 +166,7 @@ export function ValueChart({
     {!hasPoints && <p className="muted chart-empty">Очікування даних телеметрії…</p>}
     <div className="legend">{visibleSeries.map((item, index) => {
       const value = item.values.at(-1)?.value;
-      return <span key={item.name} style={{ color: COLORS[index % COLORS.length] }}>
+      return <span key={item.name} style={{ color: seriesColor(item) }}>
         {item.name}: {value === undefined ? '—' : Number(value).toFixed(2)}
       </span>;
     })}</div>

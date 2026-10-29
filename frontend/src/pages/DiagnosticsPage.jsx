@@ -46,7 +46,7 @@ function axisLabel(name) {
 }
 
 function makeSeries(samples, names) {
-  return names.map(({ key, label }) => ({ name: label, values: samples[key] || [] }));
+  return names.map(({ key, label }) => ({ key, name: label, values: samples[key] || [] }));
 }
 
 function isPercent(value) {
