@@ -125,24 +125,14 @@ class QaCliAdapter:
         since = LOG_RANGES[time_range]
         if time_range == "startup":
             service = os.environ.get("ROBOT_SERVICE_NAME", "turret.service")
-            # systemctl's human-readable timestamp (e.g. "Thu ... EET")
-            # is not a valid journalctl --since argument. Use epoch seconds.
             timestamp = self._run(
-                "systemctl", "show", "--property=ActiveEnterTimestampUSec", "--value", service
+                "systemctl", "show", "--property=ActiveEnterTimestamp", "--value", service
             ).strip()
             try:
-                # systemctl may return a human-readable timestamp even for
-                # ActiveEnterTimestampUSec; use monotonic-free numeric data
-                # from show --property=...TimestampMonotonic only if needed.
-                from datetime import datetime as _datetime
-                if timestamp.isdigit():
-                    since = f"@{int(timestamp) // 1000000}"
-                else:
-                    import email.utils
-                    parsed = email.utils.parsedate_to_datetime(timestamp)
-                    if parsed is None or parsed.tzinfo is None:
-                        raise ValueError("timestamp has no timezone")
-                    since = f"@{int(parsed.timestamp())}"
+                # systemctl formats this in the host's local timezone.
+                wall_time = timestamp.rsplit(" ", 1)[0]
+                parsed = datetime.strptime(wall_time, "%a %Y-%m-%d %H:%M:%S")
+                since = f"@{int(parsed.astimezone().timestamp())}"
             except (ValueError, TypeError, OverflowError) as exc:
                 raise AdapterError(f"Could not parse the last start time of {service}: {timestamp}") from exc
         args = ["--since", since]
