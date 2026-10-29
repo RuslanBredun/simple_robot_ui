@@ -22,4 +22,4 @@ export ROS_LOG_DIR=/var/lib/turret-web/ros
 export FASTDDS_BUILTIN_TRANSPORTS="${TURRET_WEB_FASTDDS_BUILTIN_TRANSPORTS:-UDPv4}"
 mkdir -p "$ROS_HOME" "$ROS_LOG_DIR"
 
-exec /usr/bin/python3 /opt/turret-web/server.py
+exec /usr/bin/python3 -u /opt/turret-web/server.py

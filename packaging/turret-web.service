@@ -13,6 +13,8 @@ Environment=ROS_LOG_DIR=/var/lib/turret-web/ros
 ExecStart=/usr/bin/bash /opt/turret-web/start.sh
 Restart=on-failure
 RestartSec=3
+TimeoutStopSec=10s
+Environment=PYTHONUNBUFFERED=1
 StateDirectory=turret-web
 ProtectSystem=strict
 ProtectHome=true

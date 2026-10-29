@@ -3,6 +3,8 @@
 import json
 import os
 import re
+import signal
+import threading
 import subprocess
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -235,7 +237,10 @@ class Handler(BaseHTTPRequestHandler):
         return self.respond(200, {"ok": True, "action": action})
 
     def log_message(self, fmt, *args):
-        print(f"[{self.log_date_time_string()}] {self.address_string()} {fmt % args}")
+        # High-frequency successful polling must not flood journald.
+        if args and str(args[1] if len(args) > 1 else '') == '200':
+            return
+        super().log_message(fmt, *args)
 
 
 def main():
@@ -244,8 +249,26 @@ def main():
     Handler.ros.start()
     try:
         server = ThreadingHTTPServer((HOST, PORT), Handler)
-        print(f"Robot UI listening on http://{HOST}:{PORT}")
-        server.serve_forever()
+        server.daemon_threads = True
+        server.block_on_close = False
+        shutdown_requested = threading.Event()
+
+        def request_shutdown(signum, frame):
+            # shutdown() must run from a different thread than serve_forever().
+            if shutdown_requested.is_set():
+                return
+            shutdown_requested.set()
+            threading.Thread(target=server.shutdown, name="http-shutdown", daemon=True).start()
+
+        previous_term = signal.signal(signal.SIGTERM, request_shutdown)
+        previous_int = signal.signal(signal.SIGINT, request_shutdown)
+        try:
+            print(f"Robot UI listening on http://{HOST}:{PORT}")
+            server.serve_forever(poll_interval=0.1)
+        finally:
+            signal.signal(signal.SIGTERM, previous_term)
+            signal.signal(signal.SIGINT, previous_int)
+            server.server_close()
     finally:
         Handler.ros.stop()
 
