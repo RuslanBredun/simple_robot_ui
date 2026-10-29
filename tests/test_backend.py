@@ -70,12 +70,13 @@ class QaCliTests(unittest.TestCase):
 
         self.assertEqual(result["text"], "startup log\n")
         self.assertEqual(run.call_args_list[0].args[0], "systemctl")
-        self.assertEqual(run.call_args_list[1].args, (
-            "turret-logs",
-            "--since",
-            "Sun 2026-10-25 12:00:00 CEST",
-            "--no-pager",
+        self.assertEqual(run.call_args_list[0].args, (
+            "systemctl", "show", "--property=ActiveEnterTimestamp", "--value", "turret.service",
         ))
+        self.assertEqual(run.call_args_list[1].args[0], "turret-logs")
+        self.assertEqual(run.call_args_list[1].args[1], "--since")
+        self.assertRegex(run.call_args_list[1].args[2], r"^@[0-9]+$")
+        self.assertEqual(run.call_args_list[1].args[3], "--no-pager")
 
     def test_missing_cli_is_reported(self):
         with patch("adapters.qa_cli.shutil.which", return_value=None):
