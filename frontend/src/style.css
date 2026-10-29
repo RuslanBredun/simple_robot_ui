@@ -418,3 +418,18 @@ p { line-height: 1.6; color: #b6c3d5; }
 .auth-form label { font-size: 13px; color: #acbad0; }
 .auth-form input { background: #0c1627; color: #fff; border: 1px solid #415677; border-radius: 9px; padding: 12px; min-height: 44px; }
 .auth-form button { background: #2464a9; color: #fff; border: 1px solid #3983d3; border-radius: 9px; padding: 12px; min-height: 44px; }
+
+/* Diagnostic overview state and battery indicators */
+.status-value-row { display:flex; align-items:center; gap:10px; min-height:34px; }
+.status-icon { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; flex:0 0 28px; border-radius:8px; font-size:19px; font-weight:700; color:#a8b9d2; background:#23334c; }
+.status-icon-ok { color:#57d7a1; background:#153e31; }
+.status-icon-warning { color:#f5c15e; background:#4a361b; }
+.status-icon-error { color:#f17e83; background:#49232c; }
+.status-icon-unknown { color:#8093b0; background:#243043; }
+.battery-indicator { display:inline-flex; flex-direction:column; align-items:center; gap:2px; width:27px; height:38px; flex:0 0 27px; }
+.battery-cap { width:11px; height:3px; border-radius:2px 2px 0 0; background:#9cacc4; }
+.battery-body { display:flex; flex-direction:column; justify-content:flex-end; width:25px; height:32px; border:2px solid #9cacc4; border-radius:5px; padding:2px; }
+.battery-fill { display:block; width:100%; border-radius:2px; background:#50d49d; transition:height .25s ease; }
+.battery-warning .battery-fill { background:#f2c057; }
+.battery-error .battery-fill { background:#f07378; }
+.battery-unknown .battery-fill { background:#6c7e96; }

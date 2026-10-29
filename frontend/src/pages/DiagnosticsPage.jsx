@@ -91,10 +91,40 @@ function stateLabel(value) {
   return stateLabels[value] || value || 'Невідомо';
 }
 
-function StatusCard({ label, value, fresh, detail }) {
+
+function statusTone(value, fresh) {
+  if (!fresh) return 'unknown';
+  const state = String(value || '').toUpperCase();
+  if (/FAULT|ERROR|FAILED|ПОМИЛКА|НЕ ВДАЛОСЯ/.test(state)) return 'error';
+  if (/DEGRADED|WARNING|PAUSED|ПОПЕРЕДЖЕННЯ/.test(state)) return 'warning';
+  if (/READY|HEALTHY|COMPLETED|FINISHED|RUNNING|ГОТОВИЙ|НОРМА|ЗАВЕРШЕНО/.test(state)) return 'ok';
+  return 'neutral';
+}
+
+function StatusIcon({ kind, tone = 'neutral' }) {
+  const symbols = { turret: '◎', turretOperation: '↻', weapon: '◈', weaponOperation: '⚙', battery: '▣' };
+  return <span className={`status-icon status-icon-${tone}`} aria-hidden="true">{symbols[kind] || '●'}</span>;
+}
+
+function BatteryIndicator({ percent, available }) {
+  const charge = available ? Math.max(0, Math.min(100, percent)) : 0;
+  const tone = !available ? 'unknown' : charge < 30 ? 'error' : charge < 70 ? 'warning' : 'ok';
+  return <span className="battery-indicator" role="img"
+    aria-label={available ? `Орієнтовний заряд батареї ${Math.round(charge)}%` : 'Заряд батареї недоступний'}>
+    <span className="battery-cap" />
+    <span className={`battery-body battery-${tone}`}>
+      <span className="battery-fill" style={{ height: `${charge}%` }} />
+    </span>
+  </span>;
+}
+
+function StatusCard({ label, value, fresh, detail, icon, tone }) {
   return <div className="status-card">
     <label>{label}</label>
-    <strong>{value ?? 'Недоступно'}</strong>
+    <div className="status-value-row">
+      {icon && <StatusIcon kind={icon} tone={tone || statusTone(value, fresh)} />}
+      <strong>{value ?? 'Недоступно'}</strong>
+    </div>
     {detail && <span className="metric-detail">{detail}</span>}
     <span className={`freshness ${fresh ? 'fresh' : ''}`}>{fresh ? 'Актуальні дані' : 'Немає актуальних даних'}</span>
   </div>;
@@ -407,13 +437,24 @@ export function DiagnosticsPage() {
       <section className="overview-group">
         <h3>Поточний стан</h3>
         <div className="status-grid">
+          <div className="status-card">
+            <label>Батарея</label>
+            <div className="status-value-row">
+              <BatteryIndicator percent={batteryPercent} available={batteryPercentAvailable} />
+              <strong>{batteryPercentAvailable ? `${Math.round(batteryPercent)}%` : 'Немає даних'}</strong>
+            </div>
+            <span className="metric-detail">{batteryPercentAvailable ? 'Орієнтовна оцінка заряду' : 'Оцінка заряду недоступна'}</span>
+            <span className={`freshness ${batteryPercentAvailable ? 'fresh' : ''}`}>{batteryPercentAvailable ? 'Актуальні дані' : 'Немає актуальних даних'}</span>
+          </div>
           <StatusCard
             label="Режим турелі"
+            icon="turret"
             value={isFresh(diagnostics?.gimbal) ? stateLabel(diagnostics.gimbal.mode) : 'Немає даних'}
             fresh={isFresh(diagnostics?.gimbal)}
           />
           <StatusCard
             label="Операція турелі"
+            icon="turretOperation"
             value={isFresh(diagnostics?.gimbal)
               ? `${stateLabel(diagnostics.gimbal.operation_type)} · ${stateLabel(diagnostics.gimbal.operation_state)}`
               : 'Немає даних'}
@@ -421,6 +462,7 @@ export function DiagnosticsPage() {
           />
           <StatusCard
             label="Режим зброї"
+            icon="weapon"
             value={isFresh(diagnostics?.modes?.weapon)
               ? stateLabel(diagnostics.modes.weapon.mode)
               : 'Немає даних'}
@@ -428,6 +470,7 @@ export function DiagnosticsPage() {
           />
           <StatusCard
             label="Операція зброї"
+            icon="weaponOperation"
             value={isFresh(diagnostics?.modes?.weapon)
               ? `${stateLabel(diagnostics.modes.weapon.operation_type)} · ${stateLabel(diagnostics.modes.weapon.operation_state)}`
               : 'Немає даних'}
