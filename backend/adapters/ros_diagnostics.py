@@ -93,7 +93,7 @@ class RosDiagnosticsAdapter:
                     "received_at": _now(),
                 },
                 "sensors_error": None,
-                "stm_info": {"firmware_version": "1.2", "hardware_revision": "1.0", "protocol_version": "1.1", "received_at": _now()},
+                "stm_info": {"firmware_version": "3.3", "hardware_revision": "unknown", "protocol_version": "uart", "received_at": _now()},
             }
             return
         self._thread = threading.Thread(target=self._spin, name="ros-diagnostics", daemon=True)
@@ -225,18 +225,12 @@ class RosDiagnosticsAdapter:
             if rclpy.ok():
                 rclpy.shutdown()
 
-    @staticmethod
-    def _version_0xMMmm(value):
-        if not isinstance(value, int) or not 0 <= value <= 0xFFFF:
-            return None
-        return f"{(value >> 8) & 0xFF}.{value & 0xFF}"
-
     def _stm_info_callback(self, message):
         with self._lock:
             self._state["stm_info"] = {
-                "firmware_version": self._version_0xMMmm(message.firmware_version),
-                "hardware_revision": self._version_0xMMmm(message.hardware_revision),
-                "protocol_version": self._version_0xMMmm(message.protocol_version),
+                "firmware_version": message.firmware_version,
+                "hardware_revision": message.hardware_revision,
+                "protocol_version": message.protocol_version,
                 "received_at": _now(),
             }
 
