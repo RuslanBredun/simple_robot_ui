@@ -161,6 +161,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/info":
                 return self.respond(200, {
                     **self.qa.info(),
+                    "stm_info": self.ros.snapshot().get("stm_info"),
                     "host": self.system.identity(),
                     "web_ui": web_ui_build_info(),
                     "mock": MOCK_MODE,

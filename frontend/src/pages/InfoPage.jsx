@@ -78,7 +78,7 @@ const INFO_GROUPS = [
   },
 ];
 
-function InfoCards({ fields, webUi }) {
+function InfoCards({ fields, webUi, stmInfo }) {
   const normalize = (key) => key.trim().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').toUpperCase();
   const available = new Map(
     Object.entries(fields)
@@ -91,7 +91,9 @@ function InfoCards({ fields, webUi }) {
     const resolvedValue = valueFrom === 'web_ui_build_date'
       ? webUi?.build_date
       : value ?? sourceValue;
-    return [key, resolvedValue || 'Немає даних'];
+    const stmValue = key === 'STM SOFTWARE VERSION' ? stmInfo?.firmware_version
+      : key === 'STM BOARD VERSION' ? stmInfo?.hardware_revision : null;
+    return [key, stmValue ?? resolvedValue ?? 'Немає даних'];
   });
   const groups = INFO_GROUPS.map(({ id, title, entries, sections }) => ({
     id,
@@ -160,7 +162,7 @@ export function InfoPage() {
     {error && <p className="error" role="alert">{error}</p>}
     {!info && !error && <p className="muted">Завантаження інформації…</p>}
     {info && tab === 'system' && <>
-      <InfoCards fields={info.fields || {}} webUi={info.web_ui} />
+      <InfoCards fields={info.fields || {}} webUi={info.web_ui} stmInfo={info.stm_info} />
     </>}
     {tab === 'guide' && <>
       <div className="tab-strip" role="tablist" aria-label="Інструкції">

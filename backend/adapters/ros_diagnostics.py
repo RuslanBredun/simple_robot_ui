@@ -35,6 +35,7 @@ class RosDiagnosticsAdapter:
             "battery_error": None,
             "sensors": None,
             "sensors_error": None,
+            "stm_info": None,
         }
         self._thread = None
         self._stop = threading.Event()
@@ -92,6 +93,7 @@ class RosDiagnosticsAdapter:
                     "received_at": _now(),
                 },
                 "sensors_error": None,
+                "stm_info": {"firmware_version": "1.2", "hardware_revision": "1.0", "protocol_version": "1.1", "received_at": _now()},
             }
             return
         self._thread = threading.Thread(target=self._spin, name="ros-diagnostics", daemon=True)
@@ -144,6 +146,12 @@ class RosDiagnosticsAdapter:
             sensor_health_type = None
             sensors_error = f"Sensor health unavailable: {exc}"
 
+        try:
+            from rob_comm_msgs.msg import STMInfo
+            stm_info_type = STMInfo
+        except (ImportError, AttributeError):
+            stm_info_type = None
+
         self._rclpy = rclpy
         try:
             if not rclpy.ok():
@@ -194,6 +202,10 @@ class RosDiagnosticsAdapter:
                     )
                 except Exception as exc:
                     sensors_error = f"Sensor health unavailable: {exc}"
+            if stm_info_type is not None:
+                node.create_subscription(
+                    stm_info_type, "/stm_info", self._stm_info_callback, state_qos
+                )
             with self._lock:
                 self._state["gimbal_error"] = gimbal_error
                 self._state["battery_error"] = battery_error
@@ -212,6 +224,21 @@ class RosDiagnosticsAdapter:
                 self._node = None
             if rclpy.ok():
                 rclpy.shutdown()
+
+    @staticmethod
+    def _version_0xMMmm(value):
+        if not isinstance(value, int) or not 0 <= value <= 0xFFFF:
+            return None
+        return f"{(value >> 8) & 0xFF}.{value & 0xFF}"
+
+    def _stm_info_callback(self, message):
+        with self._lock:
+            self._state["stm_info"] = {
+                "firmware_version": self._version_0xMMmm(message.firmware_version),
+                "hardware_revision": self._version_0xMMmm(message.hardware_revision),
+                "protocol_version": self._version_0xMMmm(message.protocol_version),
+                "received_at": _now(),
+            }
 
     def _motor_callback(self, topic, message):
         telemetry = getattr(message, "telemetry", message)
@@ -415,6 +442,7 @@ class RosDiagnosticsAdapter:
                 "modes": {name: dict(item) for name, item in self._state["modes"].items()},
                 "connection": dict(self._state["connection"]),
                 "gimbal": dict(self._state["gimbal"]) if self._state["gimbal"] else None,
+                "stm_info": dict(self._state["stm_info"]) if self._state["stm_info"] else None,
                 "battery": dict(self._state["battery"]) if self._state["battery"] else None,
                 "sensors": {
                     **self._state["sensors"],
