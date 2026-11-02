@@ -12,6 +12,8 @@ def _now():
 
 
 class RosDiagnosticsAdapter:
+    TELEMETRY_INTERVAL_SECONDS = 0.1  # At most 10 Hz per high-rate topic
+
     DEFAULT_MOTOR_TOPICS = (
         "/x_axis/state",
         "/y_axis/state",
@@ -41,6 +43,7 @@ class RosDiagnosticsAdapter:
         self._stop = threading.Event()
         self._node = None
         self._rclpy = None
+        self._last_sample_at = {}
 
     def start(self):
         if self.mock:
@@ -163,6 +166,7 @@ class RosDiagnosticsAdapter:
                 reliability=ReliabilityPolicy.RELIABLE,
                 durability=DurabilityPolicy.TRANSIENT_LOCAL,
             )
+            telemetry_qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE)
             topics = [
                 item.strip()
                 for item in os.environ.get(
@@ -175,9 +179,9 @@ class RosDiagnosticsAdapter:
                     CANOpenMotorState,
                     topic,
                     lambda msg, name=topic: self._motor_callback(name, msg),
-                    10,
+                    telemetry_qos,
                 )
-            node.create_subscription(JointState, "/joint_states", self._joint_callback, 10)
+            node.create_subscription(JointState, "/joint_states", self._joint_callback, telemetry_qos)
             node.create_subscription(WeaponState, "/weapon_state", self._weapon_callback, state_qos)
             node.create_subscription(Bool, "/connection_status", self._connection_callback, state_qos)
             if gimbal_state_type is not None:
@@ -234,7 +238,19 @@ class RosDiagnosticsAdapter:
                 "received_at": _now(),
             }
 
+    def _should_sample(self, topic):
+        # The UI needs snapshots, not every 100-200 Hz ROS update.
+        # Keep this check before parsing, allocations and wall-clock formatting.
+        now = time.monotonic()
+        previous = self._last_sample_at.get(topic)
+        if previous is not None and now - previous < self.TELEMETRY_INTERVAL_SECONDS:
+            return False
+        self._last_sample_at[topic] = now
+        return True
+
     def _motor_callback(self, topic, message):
+        if not self._should_sample(topic):
+            return
         telemetry = getattr(message, "telemetry", message)
         diagnostics = getattr(message, "diagnostics", None)
         current_ma = getattr(telemetry, "current", None)
@@ -318,6 +334,8 @@ class RosDiagnosticsAdapter:
             self._state["sensors_error"] = None
 
     def _joint_callback(self, message):
+        if not self._should_sample("/joint_states"):
+            return
         velocities = list(getattr(message, "velocity", []))
         received_at = _now()
         with self._lock:
