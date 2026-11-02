@@ -198,6 +198,14 @@ class RosDiagnosticsTests(unittest.TestCase):
         self.assertTrue(adapter._stop.is_set())
         self.assertEqual(calls, [("join", 2)])
 
+    def test_high_rate_samples_are_throttled_independently_per_topic(self):
+        adapter = RosDiagnosticsAdapter()
+        with patch("adapters.ros_diagnostics.time.monotonic", side_effect=[1.0, 1.01, 1.02, 1.11]):
+            self.assertTrue(adapter._should_sample("/x_axis/state"))
+            self.assertFalse(adapter._should_sample("/x_axis/state"))
+            self.assertTrue(adapter._should_sample("/y_axis/state"))
+            self.assertTrue(adapter._should_sample("/x_axis/state"))
+
     def test_motor_and_joint_samples_are_exposed(self):
         adapter = RosDiagnosticsAdapter()
 
